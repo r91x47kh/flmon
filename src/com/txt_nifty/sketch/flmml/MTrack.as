@@ -53,6 +53,14 @@
             return m_events.length;
         }
 
+		/**
+		 * トラックの波形の一部を取得する。
+		 * 
+		 * @param	samples 波形を書き込む対象となるNumber配列。
+		 * @param	start ？
+		 * @param	end ？
+		 * @param	signal
+		 */
         public function onSampleData(samples:Vector.<Number>, start:int, end:int, signal:MSignal = null):void {
             if (isEnd()) return;
             var startCnt:int = m_signalCnt;
@@ -237,6 +245,7 @@
             if (signal != null) signal.terminate();
         }
 
+		/** m_delta と m_globalTick と m_chordEnd をいじる */
         public function seek(delta:int):void {
             m_delta += delta;
             m_globalTick += delta;
@@ -364,10 +373,10 @@
             m_events.push(e);
         }		
 		
-		// 新規イベントインスタンスを得る
+		/** 新規イベントインスタンスを得る */
 		protected function makeEvent():MEvent {
-			var e:MEvent = new MEvent(m_globalTick);
-			e.setDelta(m_delta);
+			var e:MEvent = new MEvent(m_globalTick); // ここで m_globalTick を使っているので注意
+			e.setDelta(m_delta); // ここで setDelta しているので注意
 			m_delta = 0;
 			return e;
 		}
@@ -568,22 +577,26 @@
             m_globalTick = 0;
         }
 
+		/** conduct( = 指揮)する。具体的には、他トラックの同じtick位置にテンポ変更イベントを仕込む。 */
         public function conduct(trackArr:Array):void {
-            var ni:int = m_events.length;
-            var nj:int = trackArr.length;
+            var m_eventsLength:int = m_events.length;
+            var trackArrLength:int = trackArr.length;
+			
             var globalTick:uint = 0;
             var globalSample:uint = 0;
+			
             var spt:Number = calcSpt(DEFAULT_BPM);
             var i:int, j:int;
             var e:MEvent;
-            for(i = 0; i < ni; i++) {
+			
+            for(i = 0; i < m_eventsLength; i++) {
                 e = m_events[i];
                 globalTick += e.getDelta();
                 globalSample += e.getDelta() * spt;
                 switch(e.getStatus()) {
-                case MStatus.TEMPO:
+                case MStatus.TEMPO: // このメソッドの要はここ
                     spt = calcSpt(e.getTempo());
-                    for (j = FIRST_TRACK; j < nj; j++) {
+                    for (j = FIRST_TRACK; j < trackArrLength; j++) { // 全トラックの同じ位置に TEMPO イベントを入れる
                         trackArr[j].recTempo(globalTick, e.getTempo());
                     }
                     break;
@@ -592,7 +605,7 @@
                 }
             }
             var maxGlobalTick:int = 0;
-            for (j = FIRST_TRACK; j < nj; j++) {
+            for (j = FIRST_TRACK; j < trackArrLength; j++) {
                 if (maxGlobalTick < trackArr[j].getRecGlobalTick()) maxGlobalTick = trackArr[j].getRecGlobalTick();
             }
             e = makeEvent();
@@ -606,7 +619,8 @@
 
             m_totalMSec = globalSample*1000/44100;
         }
-        // calc number of samples per tick
+        /** calc number of samples per tick
+		 * Ex: 120[bpm] -> 229.6875[sample/tick] */
         private function calcSpt(bpm:Number):Number {
             var tps:Number = bpm * 96.0 / 60.0; // ticks per second (quater note = 96ticks)
             return 44100.0 / tps;              // samples per tick

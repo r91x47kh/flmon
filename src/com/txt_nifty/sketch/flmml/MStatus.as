@@ -1,4 +1,5 @@
 ﻿package com.txt_nifty.sketch.flmml {
+	/** MEvent の種類を定義したクラス */
     public final class MStatus {
         public static const EOT:int           = 0;
         public static const NOP:int           = 1;

@@ -480,6 +480,7 @@
             }
         }
 
+		/** m_string を parse しながら MTrack インスタンスのメソッドを実行していく */
         protected function firstLetter():void {
             var c:String = getCharNext();
             var c0:String;
@@ -538,7 +539,7 @@
                 break;
             case ";": // end of track
                 m_keyoff = 1;
-                if (m_tracks[m_trackNo].getNumEvents() > 0) {
+                if (m_tracks[m_trackNo].getNumEvents() > 0) { // 「;;;;」でトラックが大量生成されないようにする
                 	m_trackNo++;
                 }
                 m_tracks[m_trackNo] = createTrack();
@@ -677,10 +678,12 @@
             return new MTrack();
         }
 
+		/** m_letter （m_string のうちのどこを参照しているかのマーカー）をリセットする */
         protected function begin():void {
             m_letter = 0;
         }
 
+		/** m_string を parse しながら MTrack インスタンスのメソッドを実行していく */
         protected function process():void {
             begin();
             while(m_letter < m_string.length) {
@@ -688,6 +691,7 @@
             }
         }
 
+		/** 繰り返し文法を処理して m_string を更新する */
         protected function processRepeat():void {
             m_string = m_string.toLowerCase();
             begin();
@@ -815,6 +819,7 @@
             return false;
         }
 
+		/** #系マクロを処理してMMLインスタンスのフィールドの状態を変えたりオシレータを初期化したりする＋$系マクロを展開する */
         protected function processMacro():void {
             var i:int;
 			var matched:Array;
@@ -1121,8 +1126,8 @@
 			return tt;
 		}	
 		
-        protected function processComment(str:String):void {
-            m_string = str;
+		/** m_string からコメントを削除する */
+        protected function processComment():void {
             begin();
             var commentStart:int = -1;
             while(m_letter < m_string.length) {
@@ -1170,6 +1175,7 @@
             // trace(m_string);
         }
 
+		/** 和音文法を処理して m_string を更新する */
 		protected function processGroupNotes():void {
 			var GroupNotesStart:int = -1;
 			var GroupNotesEnd:int;
@@ -1283,11 +1289,19 @@
             return str.substring(0, start) + str.substring(end+1);
         }
 
+		/**
+		 * △ play     ○ resumeOrPlay
+		 * ポーズ中だったら再生をレジュームする。停止中だったら再生を開始する。
+		 * 
+		 * @param	str
+		 */
         public function play(str:String):void {
-            if (m_sequencer.isPaused()) {
+            if (m_sequencer.isPaused()) { // ポーズ中だったら再生をレジュームする
                 m_sequencer.play();
                 return;
             }
+			
+			// 停止中だったら再生を開始する
             m_sequencer.disconnectAll();
             m_tracks = new Array();
             m_tracks[0] = createTrack();
@@ -1320,7 +1334,10 @@
 			m_metaCoding  = "";
             m_metaComment = "";
 			
-            processComment(str);
+            m_string = str;
+			
+			// 以下では m_string に入っている String をいじる
+            processComment();
             //trace(m_string+"\n\n");
             processMacro();
             //trace(m_string);
@@ -1329,6 +1346,8 @@
             //trace(m_string);
 			processGroupNotes();
 			// trace(m_string);
+			
+			// 以下では m_string をコンパイルする
             process();
 
             // omit
@@ -1338,6 +1357,7 @@
             m_tracks[MTrack.TEMPO_TRACK].conduct(m_tracks);
 
             // post process
+			// 和音機能のゴタゴタを処理して、各トラックの末尾に2秒の静音を加えて、MSequencerインスタンスに各MTrackをconnect
             for(var i:int = MTrack.TEMPO_TRACK; i < m_tracks.length; i++) {
                 if (i > MTrack.TEMPO_TRACK) {
 					if (m_usingPoly && (m_polyForce || m_tracks[i].findPoly())) {
