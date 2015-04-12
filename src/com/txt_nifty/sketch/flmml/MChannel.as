@@ -56,9 +56,14 @@
         private var m_voiceid:Number;		// ボイスID
 		
 
+		/**
+		 * 音高の粒度。 
+		 * PITCH_RESOLUTION が 100 ならば、粒度は 1/100 semitone( = 1 cent)。  */
         public    static var PITCH_RESOLUTION:int = 100;
         protected static var s_init:int = 0;
+		/** 周波数 No.（ = freqNo）に対応する周波数を定めたマップ。このマップに載っていない周波数の音はFlMMLでは再生できない。 */
         protected static var s_frequencyMap:Vector.<Number> = new Vector.<Number>(128 * PITCH_RESOLUTION);
+		/** 周波数マップの要素数。 */
         protected static var s_frequencyLen:int;
         protected static var s_volumeMap:Vector.<Vector.<Number>>;
         protected static var s_volumeLen:int;
@@ -111,7 +116,8 @@
             if (!s_init) {
                 var i:int;
                 s_frequencyLen = s_frequencyMap.length;
-                for(i = 0; i < s_frequencyLen; i++) {
+                for (i = 0; i < s_frequencyLen; i++) {
+					// s_frequencyMap[69*PITCH_RESOLUTION] が 440.0 となるように s_frequencyMap の要素を構成
                     s_frequencyMap[i] = 440.0 * Math.pow(2.0, (i-69*PITCH_RESOLUTION)/(12.0*PITCH_RESOLUTION));
                 }
                 s_volumeLen = 128;
@@ -149,6 +155,13 @@
         		}
         	}
         }
+		/**
+		 * 周波数 No. を周波数に変換する。
+		 * 範囲外の周波数 No. が渡された場合、 [0, 最大周波数No.) の範囲にクリッピングする。
+		 * 
+		 * @param	freqNo 周波数 No.
+		 * @return 対応する周波数
+		 */
         public static function getFrequency(freqNo:int):Number {
             freqNo = (freqNo < 0) ? 0 : (freqNo >= s_frequencyLen) ? s_frequencyLen-1 : freqNo;
             return s_frequencyMap[freqNo];

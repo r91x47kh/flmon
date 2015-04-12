@@ -1,5 +1,6 @@
 ﻿package com.txt_nifty.sketch.flmml {
 	import mx.controls.videoClasses.CuePointManager;
+	import mx.utils.StringUtil;
 
     public class MEvent {
         private var m_delta:int;
@@ -25,7 +26,8 @@
         public function setNoteOff(noteNo:int, vel:int):void  { set(MStatus.NOTE_OFF, noteNo, vel); }
         public function setTempo(tempo:Number):void              { set(MStatus.TEMPO, tempo * TEMPO_SCALE, 0); }
         public function setVolume(vol:int):void               { set(MStatus.VOLUME, vol, 0); }
-        public function setNote(noteNo:int):void              { set(MStatus.NOTE, noteNo, 0); }
+        /** このイベントの status を、タイ専用の status である MStatus.NOTE に設定する */
+		public function setNote(noteNo:int):void              { set(MStatus.NOTE, noteNo, 0); }
         public function setForm(form:int, sub:int):void       { set(MStatus.FORM, form, sub); }
         public function setEnvelope1Atk(a:int):void           { set(MStatus.ENVELOPE1_ATK, a, 0); }
         public function setEnvelope1Point(t:int, l:int):void  { set(MStatus.ENVELOPE1_ADD, t, l); }
@@ -108,5 +110,14 @@
 		public function getPortBase():int   { return m_data0; }
 		public function getVoiceCount():int { return m_data0; }
 		public function getHwLfoData():int  { return m_data0; }
+		
+		/**
+		 * このインスタンスの文字列表現を返す。
+		 * 
+		 * @return このインスタンスの文字列表現
+		 */
+		public function toString():String {
+			return StringUtil.substitute("tick={0},\tstatus={1},\tdata0={2},\tdata1={3},\tdelta={4}", m_tick, MStatus.getStatusName(m_status), m_data0, m_data1, m_delta);
+		}
     }
 }

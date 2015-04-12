@@ -6,6 +6,10 @@
 
     public class MML extends EventDispatcher {
         protected var m_sequencer:MSequencer;
+		/** このインスタンスが内包する MSequencer インスタンスを返す。 */
+		public function getSequencer():MSequencer {
+			return m_sequencer;
+		}
         protected var m_tracks:Array;
         protected var m_string:String;
         protected var m_trackNo:int;
@@ -17,7 +21,6 @@
         protected var m_length:int;          // default length
         protected var m_tempo:Number;
         protected var m_letter:int;
-        protected var m_keyoff:int;
         protected var m_gate:int;
         protected var m_maxGate:int;
         protected var m_form:int;
@@ -34,6 +37,11 @@
 		protected var m_metaArtist:String;
 		protected var m_metaCoding:String;
 		protected var m_metaComment:String;
+		
+		//parse中に変化する状態たち
+		/** 現在のキーオフ状態 */
+		protected var m_keyoff:int;
+        
         protected static var MAX_PIPE:int = 3;
         protected static var MAX_SYNCSOURCE:int = 3;
 		protected static var MAX_POLYVOICE:int = 64;
@@ -86,35 +94,41 @@
 				var tick:int = 0;
 				var tickTemp:int;
 				var tie:int = 0;
-				var keyon:int = (m_keyoff == 0) ? 0 : 1;
+				var keyon:int = (m_keyoff == 0) ? 0 : 1; // 前のノートがキーオフをキャンセルしていた場合、このノートではキーオンをキャンセルする
 				m_keyoff = 1;
-				while (1) {
-					if (getChar() != '%') {
-						lenMode = 0;
+				while (1) { // ノート文字に後続する文字を parse
+					if (getChar() != '%') { // 絶対tick指定の有無を調査
+						lenMode = 0; // tick指定モードは相対モードのまま
 					}
 					else {
-						lenMode = 1;
+						lenMode = 1; // tick指定モードを絶対モードにする
 						next();
 					}
-					len = getUInt(0);
+					len = getUInt(0); // 後続する非負整数を取得
+					
+					// 「○○&」に後続する文字列が非負整数文字列でなかった場合、
+					// 例えばparse済み文字列とparse中文字が「c4&[a]」のような状態になった場合、
+					// キーオフをキャンセルした状態のまま recNote に向かう
 					if (tie == 1 && len == 0) {
 						m_keyoff = 0;
 						break;
 					}
-					tickTemp = (lenMode ? len : len2tick(len));
-					tick += getDot(tickTemp);
-					tie = 0;
+					tickTemp = (lenMode ? len : len2tick(len)); // tick指定モードに応じてノートのtick数を計算
+					tick += getDot(tickTemp); // 符点を処理
+					tie = 0; // タイの有効無効を初期化
 					if (getChar() == '&') { // tie
-						tie = 1;
-						next();
+						tie = 1; // タイを有効化
+						next(); // タイを有効化した状態で次の文字の処理へ（c4&4 のような記法に対応するため）
 					}
 					else {
-						break;
+						break; // タイの連続が途絶えたらループを脱出（例えば c4&4&2..& まで読んだ時点でループを脱出）
 					}
 				}
 				if (m_portamento == 1) { // ポルタメントなら
 					m_tracks[m_trackNo].recPortamento(m_beforeNote - (noteNo + m_octave * 12), tick);
 				}
+				// parseが「c4&[a]」のような時点で終了した場合に限り、
+				// m_keyoff が 0 になる
 				m_tracks[m_trackNo].recNote(noteNo + m_octave * 12, tick, m_velocity, keyon, m_keyoff);
 				if (m_portamento == 1) { // ポルタメントなら
 					m_tracks[m_trackNo].recPortamento(0, 0);
@@ -601,6 +615,13 @@
             return k;
         }
 
+		/**
+		 * 後続する文字列を非負整数文字列と見なしてparseする。
+		 * 後続する文字列が非負整数文字列でなかった場合は def を返す。
+		 * 
+		 * @param	def 後続する文字列が非負整数文字列でなかった場合に返す値
+		 * @return parseの結果得られた非負整数
+		 */
         protected function getUInt(def:int):int {
             var ret:int = 0;
             var l:int = m_letter;

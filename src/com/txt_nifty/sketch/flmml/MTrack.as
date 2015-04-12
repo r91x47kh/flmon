@@ -49,9 +49,24 @@
 			m_chordMode = false;
         }
 
+		/**
+		 * MTrackインスタンスが保持しているMEvent列の、要素数を返す。
+		 * @return MTrackインスタンスが保持しているMEvent列の、要素数
+		 */
         public function getNumEvents():int {
             return m_events.length;
         }
+		
+		/**
+		 * MTrackインスタンスが保持しているMEvent列を返す。
+		 * deep copy どころか shallow copy もしない。そのまま返す。
+		 * 
+		 * @return MTrackインスタンスが保持しているMEvent列
+		 */
+		// TODO: deep copy を使わずに m_events を read-only で公開する
+		public function getEvents():Array {
+			return m_events;
+		}
 
 		/**
 		 * トラックの波形の一部を取得する。
@@ -256,17 +271,18 @@
             m_globalTick = m_chordBegin;
 		}
 
-        public function recDelta(e:MEvent):void {
-            e.setDelta(m_delta);
-            m_delta = 0;
-        }
+		// 誰も使っていないメソッド
+        //public function recDelta(e:MEvent):void {
+        //    e.setDelta(m_delta);
+        //    m_delta = 0;
+        //}
 
         public function recNote(noteNo:int, len:int, vel:int, keyon:int = 1, keyoff:int = 1):void {
             var e0:MEvent = makeEvent();
             if (keyon) {
                 e0.setNoteOn(noteNo, vel);
             }
-            else {
+            else { // キーオンがキャンセルされていた場合（前のノートがキーオフをキャンセルしていると、現在のノートはキーオンがキャンセルされる）
                 e0.setNote(noteNo);
             }
             pushEvent(e0);
@@ -282,6 +298,9 @@
 				}
             }
             else {
+				// キーオフがキャンセルされていた場合、
+				// すなわち rec する note が「c&」のようなものだった場合は、
+				// seek するだけで recNoteOff はしない
                 seek(len);
             }
         }
@@ -614,7 +633,7 @@
             globalSample += (maxGlobalTick - globalTick) * spt;
 
             recRestMSec(3000);
-            recEOT();
+            recEOT(); // recEOT はここでしか呼ばれない
             globalSample += 3 * 44100;
 
             m_totalMSec = globalSample*1000/44100;
@@ -659,6 +678,24 @@
 		// ポリ命令を１回でも使ったか？
 		public function findPoly():Boolean {
 			return m_polyFound;
+		}
+		
+		/**
+		 * [デバッグ用メソッド] このインスタンスが持つ MEvent の列の内容を文字列の形で出力する。
+		 * 
+		 * @return このインスタンスが持つ MEvent の列の内容
+		 */
+		public function getEventsStr():String {
+			var eventsStr:String = "";
+			
+			var i:uint;
+			
+			var len:uint = m_events.length;
+			for (i = 0; i < len; i++) {
+				eventsStr += m_events[i].toString() + "\n";
+			}
+			
+			return eventsStr;
 		}
     }
 }

@@ -1,8 +1,16 @@
 ﻿package com.txt_nifty.sketch.flmml {
     import mx.core.UIComponent;
 
+	/**
+	 * MML クラスの UIComponent ラッパ。
+	 * このクラスがあることで、MXML の mx:Script 要素内のスクリプトの量を減らせる。
+	 */
     public class FlMML extends UIComponent {
         private var m_mml:MML;
+		/** このインスタンスが内包するMMLインスタンスを返す。 */
+		public function getMML():MML {
+			return m_mml;
+		}
 
         public function FlMML() {
             m_mml = new MML();

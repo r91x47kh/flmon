@@ -47,6 +47,13 @@ package com.txt_nifty.sketch.flmml {
 		/** 現在オーディオデバイスのバッファへの波形コピーが実行中かどうか */
         protected var m_output:Boolean; //! 現在バッファ書き込み中かどうか
         protected var m_trackArr:Array;
+		/**
+		 * このインスタンスが内包する MTrack インスタンスのリストを返す。
+		 * deep copy どころか shallow copy もせずにそのまま返す。
+		 */
+		public function getTrackArr():Array {
+			return m_trackArr;
+		}
         protected var m_signalArr:Array;
         protected var m_signalPtr:int;
         protected var m_globalTick:uint;

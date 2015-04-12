@@ -13,154 +13,118 @@
 
 	<mx:Script>
 	  <![CDATA[
-	          import com.txt_nifty.sketch.flmml.MMLEvent;
+				import com.txt_nifty.sketch.flmml.MEvent;
+				import com.txt_nifty.sketch.flmml.MStatus
+				import com.txt_nifty.sketch.flmml.MML;
+				import com.txt_nifty.sketch.flmml.MMLEvent;
+				import com.txt_nifty.sketch.flmml.MSequencer;
+				import net.vt6f3ohw.flmon.PianoRoll;
 				import flash.display.Graphics;
 				import flash.display.Shape;
 				import flash.display.Sprite;
 				import flash.text.TextField;
+				import net.vt6f3ohw.flmon.PianoRollItem;
 				
-	          protected var m_timer:Timer;
+				protected var m_timer:Timer;
 			  
 			  
 				// 定数たち
-				/** 1拍あたりの幅 */
-				private var BEAT_WIDTH:uint = 48;
-				/** 1半音あたりの高さ */
-				private var SEMITONE_HEIGHT:uint = 12;
 				
 				// Sprite製UI部品たち
-				private var _rootSp_ref:Sprite; // root となる Sprite
-					private var _shape_ref:Shape;
+				private var _rootSp_PRoll_ref:PianoRoll; // root となる Sprite
 					private var _text_ref:TextField;
-				private var _m_ref:Sprite; // マスク
+				private var _mask_PRoll_ref:Sprite; // マスク
 				
 				// カウンタたち
 				private var frameCounter:uint = 0;
 
-	          public function init():void {
-				var i:int; // for用カウンタ
-				  
-	            if (this.parameters["mml"] != undefined)
-	              input.text = unescape(this.parameters["mml"]);
+				public function init():void {
+					var i:int; // for用
+					  
+					if (this.parameters["mml"] != undefined) // mmlパラメータが渡されていたらMML入力欄にそれを置いておく
+						input.text = unescape(this.parameters["mml"]);
 
-	            player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
-	            player.addEventListener(MMLEvent.COMPLETE,         onComplete);
-	            player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
-	            m_timer = new Timer(250*4, 0);
-	            m_timer.addEventListener(TimerEvent.TIMER, onSecond);
-				  
+					player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
+					player.addEventListener(MMLEvent.COMPLETE,         onComplete);
+					player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
+					
+					m_timer = new Timer(250*4, 0); // 「1秒ごとに」「無限回」繰り返す
+					m_timer.addEventListener(TimerEvent.TIMER, onSecond);
 
-				{ // ピアノロール部分のUIの投入
-					{ // mx:Image の中に Sprite ツリーを投入
-						var rootSp:Sprite; // mx:Image の中で root となる Sprite
-						{
-							rootSp = new Sprite(); // add
-							rootSp.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
-							rootSp.graphics.beginFill(0xffffff);
-							rootSp.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-							rootSp.graphics.endFill();
-							{ // rootSp に子 Sprite （丸）を追加
-								var shape:Shape;
-								{
-									shape = new Shape();
-									shape.graphics.beginFill(0xffffff);
-									shape.graphics.lineStyle(2, 0x000000);
-									shape.graphics.drawCircle(0, 0, 100);
-									shape.graphics.endFill();
+					{ // UIの用意
+						{ // 小節数表示部分のUIの投入
+							;
+						}
+						{ // 鍵盤部分のUIの投入
+							;
+						}
+						{ // ピアノロール部分のUIの投入
+							{ // mx:Image の中に Sprite ツリーを投入
+								var rootSp_PRoll:PianoRoll; // mx:Image の中で root となる Sprite
+								{ // rootSp_PRoll の初期化
+									rootSp_PRoll = new PianoRoll();
+									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
+									{ // rootSp_PRoll 直下に背景矩形を描き込み
+										rootSp_PRoll.graphics.beginFill(0xffffff);
+										rootSp_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+										rootSp_PRoll.graphics.endFill();
+									}
+									{ // rootSp_PRoll に子Sprite （テキスト）を追加
+										var text:TextField;
+										{
+											text = new TextField();
+											text.x = 20;
+											text.y = 20;
+										}
+										_text_ref = text; // 参照のプール
+										
+										rootSp_PRoll.addChild(text);
+									}
 								}
-								_shape_ref = shape; // 参照のプール
+								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
 								
-								rootSp.addChild(shape);
+								pianoroll.addChild(rootSp_PRoll);
 							}
-							{ // rootSp に子 Sprite （線）を追加
-								var shape2:Shape;
-								{
-									shape2 = new Shape();
-									{ // 1拍ごとに線を引く
-										shape2.graphics.lineStyle(0.4, 0xeeeeee);
-										for (i = 0 ; i < 40 ; i++ ) {
-											shape2.graphics.moveTo(BEAT_WIDTH*i, 0);
-											shape2.graphics.lineTo(BEAT_WIDTH*i, SEMITONE_HEIGHT*128);
-										}
+							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
+								var mask_PRoll:Sprite;
+								{ // mask_PRoll の初期化
+									mask_PRoll = new Sprite();
+									mask_PRoll.graphics.beginFill(0xffffff);
+									{
+										mask_PRoll.graphics.lineStyle(0, 0xff0000);
+										mask_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
 									}
-									{ // 半音ごとに線を引く
-										shape2.graphics.lineStyle(0.4, 0xeeeeee);
-										for (i = 0 ; i <= 128 ; i++ ) {
-											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*i);
-											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*i);
-										}
-									}
-									{ // 1小節ごとに線を引く
-										shape2.graphics.lineStyle(3, 0xcccccc);
-										for (i = 0 ; i < 10 ; i++ ) {
-											shape2.graphics.moveTo((BEAT_WIDTH*4)*i, 0);
-											shape2.graphics.lineTo((BEAT_WIDTH*4)*i, SEMITONE_HEIGHT*128);
-										}
-									}
-									{ // C に線を引く
-										shape2.graphics.lineStyle(2, 91*0x10000 + 155*0x100 + 213);
-										for (i = 0 ; i < 10 ; i++ ) {
-											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*(8 + 12*i));
-											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*(8 + 12*i));
-										}
-									}
+									mask_PRoll.graphics.endFill();
 								}
+								_mask_PRoll_ref = mask_PRoll;
 								
-								rootSp.addChild(shape2);
-							}
-							{ // rootSp に子 Sprite （テキスト）を追加
-								var text:TextField;
-								{
-									text = new TextField();
-									text.x = 20;
-									text.y = 20;
-								}
-								_text_ref = text; // 参照のプール
-								
-								rootSp.addChild(text);
+								pianoroll.addChild(mask_PRoll); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+								pianoroll.mask = mask_PRoll;
 							}
 						}
-						_rootSp_ref = rootSp; // 参照のプール
-						
-						pianoroll.addChild(rootSp);
-					}
-					{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-						var m:Sprite;
-						{
-							m = new Sprite();
-							m.graphics.beginFill(0xffffff);
-							{
-								m.graphics.lineStyle(0, 0xff0000);
-								m.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-							}
-							m.graphics.endFill();
-						}
-						_m_ref = m;
-						
-						pianoroll.addChild(m); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
-						pianoroll.mask = m;
 					}
 				}
-	          }
 				
-				private function _onEnterFrame(event:Event):void // add
-				{
+				private function _onEnterFrame(event:Event):void {
 					//_shape_ref.x++;
 					//_shape_ref.y++;
-					//_text_ref.text = (++frameCounter).toString();
 					_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
+					_text_ref.text = (++frameCounter).toString();
 					
-					{ // 背景となる rect のサイズを更新
-						_rootSp_ref.graphics.clear();
-						_rootSp_ref.graphics.beginFill(0xffffff);
-						_rootSp_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-						_rootSp_ref.graphics.endFill();
-					}
-					{ // マスクのサイズを更新
-						_m_ref.graphics.clear();
-						_m_ref.graphics.beginFill(0x000000);
-						_m_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-						_m_ref.graphics.endFill();
+					// TODO: onEnterFrame から画面サイズ変更イベントハンドラに移動
+					{ // ピアノロール部分のUIを更新
+						{ // 背景となる rect のサイズを更新
+							_rootSp_PRoll_ref.graphics.clear();
+							_rootSp_PRoll_ref.graphics.beginFill(0xffffff);
+							_rootSp_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+							_rootSp_PRoll_ref.graphics.endFill();
+						}
+						{ // マスクのサイズを更新
+							_mask_PRoll_ref.graphics.clear();
+							_mask_PRoll_ref.graphics.beginFill(0x000000);
+							_mask_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+							_mask_PRoll_ref.graphics.endFill();
+						}
 					}
 				}
 
@@ -196,18 +160,93 @@
 	            warnings.text = player.getWarnings();
 	          }
 
-	          public function play():void {
-	            if (!player.isPlaying()) {
-	              if (player.isPaused()) m_timer.start();
-	              player.play(input.text);
-	              playButton.label = "Pause";
-	            }
-	            else {
-	              player.pause();
-	              playButton.label = "Play";
-	              m_timer.stop();
-	            }
-	          }
+				public function play():void {
+					var i:int; // for用
+					var len:int; // for用
+					var e:MEvent; // for用
+					
+					if (!player.isPlaying()) {
+						if (player.isPaused()) m_timer.start(); // 1秒ごとに再生位置表示を更新するタイマーを起動
+						player.play(input.text);
+						playButton.label = "Pause";
+					}
+					else {
+						player.pause();
+						playButton.label = "Play";
+						m_timer.stop();
+					}
+
+					var tracks:Array;
+					{
+						var sequencer:MSequencer;
+						{
+							var mml:MML;
+							{
+								mml = player.getMML();
+							}
+							
+							sequencer = mml.getSequencer();
+						}
+						
+						tracks = sequencer.getTrackArr();
+					}
+					
+					/*{ // MEvent 列をダンプ
+						len = tracks.length;
+						for (i = 0 ; i < len ; i++ ) {
+							trace("[track " + i + "]");
+							trace(tracks[i].getEventsStr()); // デバッグ用
+							trace("\n")
+						}
+					}*/
+					
+					
+					{ // tracks[1] のノート( = PianoRollItem)の列を画面上に表示
+						var pianoRollItemArr:Array;
+						{ // tracks[1] の MEvent 列をノート( = PianoRollItem)の列に変換
+							pianoRollItemArr = new Array();
+							var events:Array = tracks[1].getEvents();
+							{
+								var item:PianoRollItem;
+								
+								len = events.length;
+								for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+									e = events[i];
+									switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+										case MStatus.NOTE_ON:
+											item = new PianoRollItem();
+											item.startPosInTick = e.getTick();
+											item.startPitch = e.getNoteNo()*100;
+											item.velocity = e.getVelocity();
+											break;
+										case MStatus.NOTE_OFF:
+											item.endPosInTick = e.getTick();
+											pianoRollItemArr.push(item);
+											break;
+										default:
+											break;
+									}
+								}
+							}
+						}
+						
+						trace(pianoRollItemArr);
+						_rootSp_PRoll_ref.shape2_ref.graphics.lineStyle(4, 91*0x10000 + 155*0x100 + 213);
+						{
+							len = pianoRollItemArr.length;
+							for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+								var item2:PianoRollItem = pianoRollItemArr[i];
+								
+								{
+									_rootSp_PRoll_ref.shape2_ref.graphics.moveTo(Number(48)*(Number(item2.startPosInTick)/96.0), Number(PianoRoll.SEMITONE_HEIGHT)*(128.0-(Number(item2.startPitch/*+4800*/)/100.0)));
+									_rootSp_PRoll_ref.shape2_ref.graphics.lineTo(Number(48)*(Number(item2.endPosInTick)/96.0), Number(PianoRoll.SEMITONE_HEIGHT)*(128.0-(Number(item2.startPitch/*+4800*/)/100.0)));
+								}
+							}
+		
+						}
+					}
+					
+				}
 
 	          public function stop():void {
 	            player.stop();
