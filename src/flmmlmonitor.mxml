@@ -29,10 +29,10 @@
 				private var SEMITONE_HEIGHT:uint = 12;
 				
 				// Sprite製UI部品たち
-				private var _rootSp_ref:Sprite;
-					private var _shape_ref:Shape; // add
+				private var _rootSp_ref:Sprite; // root となる Sprite
+					private var _shape_ref:Shape;
 					private var _text_ref:TextField;
-				private var _m_ref:Sprite;
+				private var _m_ref:Sprite; // マスク
 				
 				// カウンタたち
 				private var frameCounter:uint = 0;
@@ -98,10 +98,10 @@
 										}
 									}
 									{ // C に線を引く
-										shape2.graphics.lineStyle(2, 91 * 0x10000 + 155 * 0x100 + 213);
+										shape2.graphics.lineStyle(2, 91*0x10000 + 155*0x100 + 213);
 										for (i = 0 ; i < 10 ; i++ ) {
-											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*(11 + 12*i));
-											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*(11 + 12*i));
+											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*(8 + 12*i));
+											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*(8 + 12*i));
 										}
 									}
 								}
