@@ -11,171 +11,339 @@
         }
     </mx:Style>
 
-  <mx:Script>
-    <![CDATA[
-            import com.txt_nifty.sketch.flmml.MMLEvent;
-            protected var m_timer:Timer;
+	<mx:Script>
+	  <![CDATA[
+	          import com.txt_nifty.sketch.flmml.MMLEvent;
+				import flash.display.Graphics;
+				import flash.display.Shape;
+				import flash.display.Sprite;
+				import flash.text.TextField;
+				
+	          protected var m_timer:Timer;
+			  
+			  
+				// 定数たち
+				/** 1拍あたりの幅 */
+				private var BEAT_WIDTH:uint = 48;
+				/** 1半音あたりの高さ */
+				private var SEMITONE_HEIGHT:uint = 12;
+				
+				// Sprite製UI部品たち
+				private var _rootSp_ref:Sprite;
+					private var _shape_ref:Shape; // add
+					private var _text_ref:TextField;
+				private var _m_ref:Sprite;
+				
+				// カウンタたち
+				private var frameCounter:uint = 0;
 
-            public function init():void {
-              if (this.parameters["mml"] != undefined)
-                input.text = unescape(this.parameters["mml"]);
+	          public function init():void {
+				var i:int; // for用カウンタ
+				  
+	            if (this.parameters["mml"] != undefined)
+	              input.text = unescape(this.parameters["mml"]);
 
-              player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
-              player.addEventListener(MMLEvent.COMPLETE,         onComplete);
-              player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
-              m_timer = new Timer(250*4, 0);
-              m_timer.addEventListener(TimerEvent.TIMER, onSecond);
-           }
+	            player.addEventListener(MMLEvent.COMPILE_COMPLETE, setWarnings);
+	            player.addEventListener(MMLEvent.COMPLETE,         onComplete);
+	            player.addEventListener(MMLEvent.BUFFERING,        onBuffering);
+	            m_timer = new Timer(250*4, 0);
+	            m_timer.addEventListener(TimerEvent.TIMER, onSecond);
+				  
 
-            public function setHTML():void {
-              if (tn.selectedIndex == 1) {
-                var swfVersion:String = "10.0.12"; // flash version
-                var str:String = input.text;
-                str = escape(str);
-                var token:Array = str.split("+");
-                str = token.join("%2b");
-                var date:Date = new Date();
-                var contentId:String = "flmml" + date.valueOf();
-                output.text  = "<div id=\""+contentId+"\">\n";
-                output.text += "The Flash movie is here. JavaScript enabled please.\n";
-                output.text += "</div>\n";
-                output.text += "<script type=\"text/javascript\" src=\""+jsName.text+"\"></script>\n";
-                output.text += "<script type=\"text/javascript\">\n";
-                output.text += "var flashvars = {mml: \""+str+"\"};\n";
-                output.text += "var params = {bgcolor: \"#"+swfBackground.selectedColor.toString(16)+"\"};\n";
-                output.text += "var attributes = {};\n";
-                output.text += "swfobject.embedSWF(\""+swfName.text+"\", ";
-                output.text += "\""+contentId+"\", \""+swfWidth.value+"\", \""+swfHeight.value+"\", ";
-                output.text += "\""+swfVersion+"\", \"expressInstall.swf\", flashvars, params, attributes);\n";
-                output.text += "</script>\n";
-              }
-            }
+				{ // ピアノロール部分のUIの投入
+					{ // mx:Image の中に Sprite ツリーを投入
+						var rootSp:Sprite; // mx:Image の中で root となる Sprite
+						{
+							rootSp = new Sprite(); // add
+							rootSp.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
+							rootSp.graphics.beginFill(0xffffff);
+							rootSp.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+							rootSp.graphics.endFill();
+							{ // rootSp に子 Sprite （丸）を追加
+								var shape:Shape;
+								{
+									shape = new Shape();
+									shape.graphics.beginFill(0xffffff);
+									shape.graphics.lineStyle(2, 0x000000);
+									shape.graphics.drawCircle(0, 0, 100);
+									shape.graphics.endFill();
+								}
+								_shape_ref = shape; // 参照のプール
+								
+								rootSp.addChild(shape);
+							}
+							{ // rootSp に子 Sprite （線）を追加
+								var shape2:Shape;
+								{
+									shape2 = new Shape();
+									{ // 1拍ごとに線を引く
+										shape2.graphics.lineStyle(0.4, 0xeeeeee);
+										for (i = 0 ; i < 40 ; i++ ) {
+											shape2.graphics.moveTo(BEAT_WIDTH*i, 0);
+											shape2.graphics.lineTo(BEAT_WIDTH*i, SEMITONE_HEIGHT*128);
+										}
+									}
+									{ // 半音ごとに線を引く
+										shape2.graphics.lineStyle(0.4, 0xeeeeee);
+										for (i = 0 ; i <= 128 ; i++ ) {
+											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*i);
+											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*i);
+										}
+									}
+									{ // 1小節ごとに線を引く
+										shape2.graphics.lineStyle(3, 0xcccccc);
+										for (i = 0 ; i < 10 ; i++ ) {
+											shape2.graphics.moveTo((BEAT_WIDTH*4)*i, 0);
+											shape2.graphics.lineTo((BEAT_WIDTH*4)*i, SEMITONE_HEIGHT*128);
+										}
+									}
+									{ // C に線を引く
+										shape2.graphics.lineStyle(2, 91 * 0x10000 + 155 * 0x100 + 213);
+										for (i = 0 ; i < 10 ; i++ ) {
+											shape2.graphics.moveTo(0, SEMITONE_HEIGHT*(11 + 12*i));
+											shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*(11 + 12*i));
+										}
+									}
+								}
+								
+								rootSp.addChild(shape2);
+							}
+							{ // rootSp に子 Sprite （テキスト）を追加
+								var text:TextField;
+								{
+									text = new TextField();
+									text.x = 20;
+									text.y = 20;
+								}
+								_text_ref = text; // 参照のプール
+								
+								rootSp.addChild(text);
+							}
+						}
+						_rootSp_ref = rootSp; // 参照のプール
+						
+						pianoroll.addChild(rootSp);
+					}
+					{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
+						var m:Sprite;
+						{
+							m = new Sprite();
+							m.graphics.beginFill(0xffffff);
+							{
+								m.graphics.lineStyle(0, 0xff0000);
+								m.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+							}
+							m.graphics.endFill();
+						}
+						_m_ref = m;
+						
+						pianoroll.addChild(m); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+						pianoroll.mask = m;
+					}
+				}
+	          }
+				
+				private function _onEnterFrame(event:Event):void // add
+				{
+					//_shape_ref.x++;
+					//_shape_ref.y++;
+					//_text_ref.text = (++frameCounter).toString();
+					_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
+					
+					{ // 背景となる rect のサイズを更新
+						_rootSp_ref.graphics.clear();
+						_rootSp_ref.graphics.beginFill(0xffffff);
+						_rootSp_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+						_rootSp_ref.graphics.endFill();
+					}
+					{ // マスクのサイズを更新
+						_m_ref.graphics.clear();
+						_m_ref.graphics.beginFill(0x000000);
+						_m_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+						_m_ref.graphics.endFill();
+					}
+				}
 
-            public function toClipboard():void {
-              System.setClipboard(output.text.substring(0, output.text.length));
-            }
+	          public function setHTML():void {
+	            if (tn.selectedIndex == 1) {
+	              var swfVersion:String = "10.0.12"; // flash version
+	              var str:String = input.text;
+	              str = escape(str);
+	              var token:Array = str.split("+");
+	              str = token.join("%2b");
+	              var date:Date = new Date();
+	              var contentId:String = "flmml" + date.valueOf();
+	              output.text  = "<div id=\""+contentId+"\">\n";
+	              output.text += "The Flash movie is here. JavaScript enabled please.\n";
+	              output.text += "</div>\n";
+	              output.text += "<script type=\"text/javascript\" src=\""+jsName.text+"\"></script>\n";
+	              output.text += "<script type=\"text/javascript\">\n";
+	              output.text += "var flashvars = {mml: \""+str+"\"};\n";
+	              output.text += "var params = {bgcolor: \"#"+swfBackground.selectedColor.toString(16)+"\"};\n";
+	              output.text += "var attributes = {};\n";
+	              output.text += "swfobject.embedSWF(\""+swfName.text+"\", ";
+	              output.text += "\""+contentId+"\", \""+swfWidth.value+"\", \""+swfHeight.value+"\", ";
+	              output.text += "\""+swfVersion+"\", \"expressInstall.swf\", flashvars, params, attributes);\n";
+	              output.text += "</script>\n";
+	            }
+	          }
 
-            public function setWarnings(e:Event):void {
-              warnings.text = player.getWarnings();
-            }
+	          public function toClipboard():void {
+	            System.setClipboard(output.text.substring(0, output.text.length));
+	          }
 
-            public function play():void {
-              if (!player.isPlaying()) {
-                if (player.isPaused()) m_timer.start();
-                player.play(input.text);
-                playButton.label = "Pause";
-              }
-              else {
-                player.pause();
-                playButton.label = "Play";
-                m_timer.stop();
-              }
-            }
+	          public function setWarnings(e:Event):void {
+	            warnings.text = player.getWarnings();
+	          }
 
-            public function stop():void {
-              player.stop();
-              playButton.label = "Play";
-              m_timer.reset();
-              progress.text = "";
-			  voiceCount.text = "";
-            }
+	          public function play():void {
+	            if (!player.isPlaying()) {
+	              if (player.isPaused()) m_timer.start();
+	              player.play(input.text);
+	              playButton.label = "Pause";
+	            }
+	            else {
+	              player.pause();
+	              playButton.label = "Play";
+	              m_timer.stop();
+	            }
+	          }
 
-            public function onComplete(e:Event):void {
-              playButton.label = "Play";
-              m_timer.reset();
-              progress.text = "";
-			  voiceCount.text = "";
-            }
-
-            public function onBuffering(e:MMLEvent):void {
-              if (e.progress < 100) {
-				  progress.text = "Buffering " + e.progress + "%";
+	          public function stop():void {
+	            player.stop();
+	            playButton.label = "Play";
+	            m_timer.reset();
+	            progress.text = "";
 				  voiceCount.text = "";
-              } else {
-                onSecond(e);
-                m_timer.start();
-              }
-            }
+	          }
 
-            public function onSecond(e:Event):void {
-              progress.text = player.getNowTimeStr() + " / " + player.getTotalTimeStr();
-//			  voiceCount.text = "♪" + player.getVoiceCount();
-            }
-        ]]>
-  </mx:Script>
+	          public function onComplete(e:Event):void {
+	            playButton.label = "Play";
+	            m_timer.reset();
+	            progress.text = "";
+				  voiceCount.text = "";
+	          }
 
-  <mx:Panel title="FlMML" width="100%" height="100%"
-            paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
+	          public function onBuffering(e:MMLEvent):void {
+	            if (e.progress < 100) {
+					  progress.text = "Buffering " + e.progress + "%";
+					  voiceCount.text = "";
+	            } else {
+	              onSecond(e);
+	              m_timer.start();
+	            }
+	          }
 
-    <mx:TabNavigator id="tn"  width="100%" height="100%"
-                     paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4"
-                     change="setHTML();">
-      <mx:VBox label="MML">
-        <mx:VDividedBox width="100%" height="100%">
-          <mx:TextArea id="input" width="100%" height="90%" fontSize="14" text="L8 O5CDEFGAB&lt;C">
-          </mx:TextArea>
-          <mx:TextArea id="warnings" width="100%" height="10%" fontSize="10" editable="false">
-            <mx:text>
-            </mx:text>
-          </mx:TextArea>
-        </mx:VDividedBox>
-        <mx:Box direction="horizontal">
-          <mx:Button id="playButton" label="Play" click="play();" />
-          <mx:Button id="stopButton" label="Stop" click="stop();" />
-          <mx:HSlider id="hSlider" minimum="0" maximum="127" value="100"
-                      dataTipPlacement="top" tickColor="black" snapInterval="1"
-                      allowTrackClick="true" liveDragging="true"
-                      change="player.setMasterVolume(hSlider.value);"/>
-          <mx:Label id="progress" text="" />
-          <mx:Label id="voiceCount" text="" />
-        </mx:Box>
-        <flmml:FlMML id="player" />
-      </mx:VBox>
+	          public function onSecond(e:Event):void {
+	            progress.text = player.getNowTimeStr() + " / " + player.getTotalTimeStr();
+				  //voiceCount.text = "♪" + player.getVoiceCount();
+	          }
+	      ]]>
+	</mx:Script>
 
-      <mx:VBox label="HTML">
-        <mx:Text htmlText="&lt;u&gt;&lt;a href=&quot;http://blog.deconcept.com/swfobject/&quot;&gt;SWFObject 2.0&lt;/a&gt;&lt;/u&gt; is required."/>
-        <mx:TextArea id="output" width="100%" height="100%" fontSize="14" editable="false">
-          <mx:text>
-          </mx:text>
-        </mx:TextArea>
-        <mx:Grid>
-          <mx:GridRow>
-            <mx:GridItem>
-              <mx:Text text="jsName" />
-            </mx:GridItem>
-            <mx:GridItem>
-              <mx:TextInput id="jsName" text="swfobject.js" change="setHTML();" width="100%"/>
-            </mx:GridItem>
-          </mx:GridRow>
-          <mx:GridRow>
-            <mx:GridItem>
-              <mx:Text text="swfName" />
-            </mx:GridItem>
-            <mx:GridItem>
-              <mx:TextInput id="swfName" text="flmml.swf" change="setHTML();" width="100%"/>
-            </mx:GridItem>
-          </mx:GridRow>
-          <mx:GridRow>
-            <mx:GridItem>
-              <mx:Text text="width" />
-            </mx:GridItem>
-            <mx:GridItem>
-              <mx:Box direction="horizontal">
-                <mx:NumericStepper id="swfWidth" minimum="320" maximum="1600"
-                                   stepSize="1" value="480" change="setHTML();"/>
-                <mx:Text text="height" />
-                <mx:NumericStepper id="swfHeight" minimum="160" maximum="1200"
-                                   stepSize="1" value="320" change="setHTML();"/>
-                <mx:Text text="bgColor" />
-                <mx:ColorPicker id="swfBackground" showTextField="true" selectedColor="0xb2bfc6" change="setHTML();"/>
-              </mx:Box>
-            </mx:GridItem>
-          </mx:GridRow>
-        </mx:Grid>
-        <mx:Button id="clipButton" label="setClipboard" click="toClipboard();"/>
-      </mx:VBox>
+	<mx:Panel title="FlMML" width="100%" height="100%"
+	          paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
 
-    </mx:TabNavigator>
-  </mx:Panel>
+	  <mx:TabNavigator id="tn"  width="100%" height="100%"
+	                   paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4"
+	                   change="setHTML();">
+	    <mx:VBox label="MML">
+	      <mx:VDividedBox width="100%" height="100%" backgroundColor="#dddddd">
+	        <mx:TextArea id="input" width="100%" height="20%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
+			<mx:Grid width="100%" height="70%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
+				<mx:GridRow width="100%">
+					<mx:GridItem backgroundColor="#0080C0">
+					</mx:GridItem>
+					<mx:GridItem height="48">
+						<!--小節数--><mx:Image></mx:Image>
+					</mx:GridItem>
+					<mx:GridItem backgroundColor="#0080C0">
+					</mx:GridItem>
+				</mx:GridRow>
+
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem width="120">
+						<!--鍵盤--><mx:Image></mx:Image>
+					</mx:GridItem>
+					<mx:GridItem width="100%" height="100%">
+						<!--ピアノロール--><mx:Image id="pianoroll" width="100%" height="100%"></mx:Image>
+					</mx:GridItem>
+					<mx:GridItem>
+						<mx:VScrollBar height="100%" />
+					</mx:GridItem>
+				</mx:GridRow>
+
+				<mx:GridRow width="100%">
+					<mx:GridItem backgroundColor="#0080C0">
+					</mx:GridItem>
+					<mx:GridItem>
+						<mx:HScrollBar width="100%" />
+					</mx:GridItem>
+					<mx:GridItem backgroundColor="#0080C0">
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+	        <mx:TextArea id="warnings" width="100%" height="10%" fontSize="10" editable="false">
+	          <mx:text></mx:text>
+	        </mx:TextArea>
+	      </mx:VDividedBox>
+	      <mx:Box direction="horizontal">
+	        <mx:Button id="playButton" label="Play" click="play();" />
+	        <mx:Button id="stopButton" label="Stop" click="stop();" />
+	        <mx:HSlider id="hSlider" minimum="0" maximum="127" value="100"
+	                    dataTipPlacement="top" tickColor="black" snapInterval="1"
+	                    allowTrackClick="true" liveDragging="true"
+	                    change="player.setMasterVolume(hSlider.value);"/>
+	        <mx:Label id="progress" text="" />
+	        <mx:Label id="voiceCount" text="" />
+	      </mx:Box>
+	      <flmml:FlMML id="player" />
+	    </mx:VBox>
+
+	    <mx:VBox label="HTML">
+	      <mx:Text htmlText="&lt;u&gt;&lt;a href=&quot;http://blog.deconcept.com/swfobject/&quot;&gt;SWFObject 2.0&lt;/a&gt;&lt;/u&gt; is required."/>
+	      <mx:TextArea id="output" width="100%" height="100%" fontSize="14" editable="false">
+	        <mx:text>
+	        </mx:text>
+	      </mx:TextArea>
+	      <mx:Grid>
+	        <mx:GridRow>
+	          <mx:GridItem>
+	            <mx:Text text="jsName" />
+	          </mx:GridItem>
+	          <mx:GridItem>
+	            <mx:TextInput id="jsName" text="swfobject.js" change="setHTML();" width="100%"/>
+	          </mx:GridItem>
+	        </mx:GridRow>
+	        <mx:GridRow>
+	          <mx:GridItem>
+	            <mx:Text text="swfName" />
+	          </mx:GridItem>
+	          <mx:GridItem>
+	            <mx:TextInput id="swfName" text="flmml.swf" change="setHTML();" width="100%"/>
+	          </mx:GridItem>
+	        </mx:GridRow>
+	        <mx:GridRow>
+	          <mx:GridItem>
+	            <mx:Text text="width" />
+	          </mx:GridItem>
+	          <mx:GridItem>
+	            <mx:Box direction="horizontal">
+	              <mx:NumericStepper id="swfWidth" minimum="320" maximum="1600"
+	                                 stepSize="1" value="480" change="setHTML();"/>
+	              <mx:Text text="height" />
+	              <mx:NumericStepper id="swfHeight" minimum="160" maximum="1200"
+	                                 stepSize="1" value="320" change="setHTML();"/>
+	              <mx:Text text="bgColor" />
+	              <mx:ColorPicker id="swfBackground" showTextField="true" selectedColor="0xb2bfc6" change="setHTML();"/>
+	            </mx:Box>
+	          </mx:GridItem>
+	        </mx:GridRow>
+	      </mx:Grid>
+	      <mx:Button id="clipButton" label="setClipboard" click="toClipboard();"/>
+	    </mx:VBox>
+
+	  </mx:TabNavigator>
+	</mx:Panel>
 
 </mx:Application>
