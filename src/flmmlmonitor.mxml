@@ -72,7 +72,7 @@
 								var mask_PRoll:Sprite;
 								{ // mask_PRoll の初期化
 									mask_PRoll = new Sprite();
-									mask_PRoll.cacheAsBitmap = true;
+									mask_PRoll.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
 									mask_PRoll.graphics.beginFill(0x000000);
 									mask_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
 									mask_PRoll.graphics.endFill();
@@ -87,14 +87,7 @@
 								{ // rootSp_PRoll の初期化
 									rootSp_PRoll = new PianoRoll();
 									rootSp_PRoll.focusRect = true;
-									rootSp_PRoll.opaqueBackground = true;
-									rootSp_PRoll.cacheAsBitmap = true;
-									rootSp_PRoll.scrollRect = new Rectangle(0, 0, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
-									{ // 背景矩形を描画
-										rootSp_PRoll.graphics.beginFill(0xffffff);
-										rootSp_PRoll.graphics.drawRect(0, 0, (PianoRoll.BEAT_WIDTH*4)*100, PianoRoll.SEMITONE_HEIGHT*128);
-										rootSp_PRoll.graphics.endFill();
-									}
+									rootSp_PRoll.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
 									{ // rootSp_PRoll に子Sprite （テキスト）を追加
 										var text:TextField;
 										{
@@ -126,11 +119,23 @@
 												rootSp_PRoll.scrollRect = rect;
 											};
 											
-											if (_isKeyPressed[Keyboard.UP] != undefined && _isKeyPressed[Keyboard.UP]) { scroll(0, -20); }
-											if (_isKeyPressed[Keyboard.DOWN] != undefined && _isKeyPressed[Keyboard.DOWN]) { scroll(0, 20); }
-											if (_isKeyPressed[Keyboard.LEFT] != undefined && _isKeyPressed[Keyboard.LEFT]) { scroll(-20, 0); }
-											if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { scroll(20, 0); }
+											{
+												var isScrolled:Boolean = false; // scrollRect が変化したかどうかを格納するBoolean
+												
+												// 各キーが押下状態にあったらスクロール
+												if (_isKeyPressed[Keyboard.UP] != undefined && _isKeyPressed[Keyboard.UP]) { scroll(0, -20); isScrolled = true; }
+												if (_isKeyPressed[Keyboard.DOWN] != undefined && _isKeyPressed[Keyboard.DOWN]) { scroll(0, 20); isScrolled = true; }
+												if (_isKeyPressed[Keyboard.LEFT] != undefined && _isKeyPressed[Keyboard.LEFT]) { scroll(-20, 0); isScrolled = true; }
+												if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { scroll(20, 0); isScrolled = true; }
+												
+												// scrollRect が変化していたら Event.SCROLL イベントを dispatch
+												if(isScrolled){ rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); }
+											}
 										}
+									});
+									rootSp_PRoll.addEventListener(Event.SCROLL, function(e:Event):void { // rootSp_PRoll.scrollRect が変化したときに呼ばれるハンドラ
+										pianorollHScrollBar.scrollPosition = rootSp_PRoll.scrollRect.x;
+										pianorollVScrollBar.scrollPosition = rootSp_PRoll.scrollRect.y;
 									});
 								}
 								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
@@ -154,6 +159,14 @@
 									
 									_rootSp_PRoll_ref.scrollRect = rect;
 								}
+								{ // 縦横スクロールバーの pageSize を更新（不要？）
+									pianorollHScrollBar.pageSize = pianoroll.width;
+									pianorollVScrollBar.pageSize = pianoroll.height;
+								}
+								{ // 縦横スクロールバーの maxScrollPosition を更新
+									pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianoroll.width;
+									pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianoroll.height;
+								}
 							});
 							pianorollcontainer.focusEnabled = true;
 							pianorollcontainer.addEventListener(KeyboardEvent.KEY_DOWN, function(e2:KeyboardEvent):void {
@@ -166,6 +179,12 @@
 							// pianorollcontainer.addEventListener(FocusEvent.FOCUS_OUT, function(e3:FocusEvent):void {
 							// 	trace(e3);
 							// });
+						}
+						{ // 縦横スクロールバーの scrollPosition, maxScrollPosition を初期化
+							pianorollHScrollBar.scrollPosition = rootSp_PRoll.scrollRect.x;
+							pianorollVScrollBar.scrollPosition = rootSp_PRoll.scrollRect.y;
+							pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianoroll.width;
+							pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianoroll.height;
 						}
 					}
 				}
@@ -245,7 +264,6 @@
 							trace("\n")
 						}
 					}*/
-					
 					
 					_rootSp_PRoll_ref.itemLayer_ref.graphics.clear();
 					{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
@@ -371,7 +389,12 @@
 						<!--ピアノロール--><mx:Image id="pianoroll" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#ffffff">
-						<mx:VScrollBar height="100%" />
+						<!--縦スクロールバー--><mx:VScrollBar id="pianorollVScrollBar" height="100%"
+										minScrollPosition="0" maxScrollPosition="0" scrollPosition="0"
+										pageSize="{pianoroll.height}"
+										lineScrollSize="20" pageScrollSize="{pianoroll.height}" 
+										repeatDelay="0" repeatInterval="0"
+										scroll="_rootSp_PRoll_ref.scrollRect = new Rectangle(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition, pianoroll.width, pianoroll.height);" />
 					</mx:GridItem>
 				</mx:GridRow>
 
@@ -379,11 +402,12 @@
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#ffffff">
-					<mx:HScrollBar width="100%"
+						<!--横スクロールバー--><mx:HScrollBar id="pianorollHScrollBar" width="100%"
 										minScrollPosition="0" maxScrollPosition="0" scrollPosition="0"
 										pageSize="{pianoroll.width}"
-										lineScrollSize="50" pageScrollSize="100" 
-										repeatDelay="1000" repeatInterval="500" />
+										lineScrollSize="20" pageScrollSize="{pianoroll.width}" 
+										repeatDelay="0" repeatInterval="0"
+										scroll="_rootSp_PRoll_ref.scrollRect = new Rectangle(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y, pianoroll.width, pianoroll.height)" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>

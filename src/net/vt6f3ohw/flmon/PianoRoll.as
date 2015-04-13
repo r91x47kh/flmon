@@ -28,11 +28,18 @@ package net.vt6f3ohw.flmon {
 			
 			var i:uint; // for用
 
-			{ // 子Sprite （線レイヤ）を追加
+			this.opaqueBackground = true; // 背景を不透明に設定
+			this.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
+			{ // 背景矩形を描画
+				this.graphics.beginFill(0xffffff);
+				this.graphics.drawRect(0, 0, (PianoRoll.BEAT_WIDTH*4)*100, PianoRoll.SEMITONE_HEIGHT*128);
+				this.graphics.endFill();
+			}
+			{ // 子Shape （線レイヤ）を追加
 				var shape2:Shape;
 				{
 					shape2 = new Shape();
-					shape2.cacheAsBitmap = true;
+					shape2.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
 					{ // 1拍ごとに線を引く
 						shape2.graphics.lineStyle(0.4, 0xeeeeee);
 						for (i = 0 ; i < 400 ; i++ ) {
@@ -66,11 +73,11 @@ package net.vt6f3ohw.flmon {
 				
 				this.addChild(shape2);
 			}
-			{ // 子Sprite （ノート(= PianoRollItem)レイヤ）を追加
+			{ // 子Shape （ノート(= PianoRollItem)レイヤ）を追加
 				var itemLayer:Shape;
 				{
 					itemLayer = new Shape();
-					itemLayer.cacheAsBitmap = true;
+					itemLayer.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
 				}
 				_itemLayer_ref = itemLayer; // 参照のプール
 				
