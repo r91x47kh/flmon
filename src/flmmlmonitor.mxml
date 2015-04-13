@@ -189,34 +189,6 @@
 					}
 				}
 
-	          public function setHTML():void {
-	            if (tn.selectedIndex == 1) {
-	              var swfVersion:String = "10.0.12"; // flash version
-	              var str:String = input.text;
-	              str = escape(str);
-	              var token:Array = str.split("+");
-	              str = token.join("%2b");
-	              var date:Date = new Date();
-	              var contentId:String = "flmml" + date.valueOf();
-	              output.text  = "<div id=\""+contentId+"\">\n";
-	              output.text += "The Flash movie is here. JavaScript enabled please.\n";
-	              output.text += "</div>\n";
-	              output.text += "<script type=\"text/javascript\" src=\""+jsName.text+"\"></script>\n";
-	              output.text += "<script type=\"text/javascript\">\n";
-	              output.text += "var flashvars = {mml: \""+str+"\"};\n";
-	              output.text += "var params = {bgcolor: \"#"+swfBackground.selectedColor.toString(16)+"\"};\n";
-	              output.text += "var attributes = {};\n";
-	              output.text += "swfobject.embedSWF(\""+swfName.text+"\", ";
-	              output.text += "\""+contentId+"\", \""+swfWidth.value+"\", \""+swfHeight.value+"\", ";
-	              output.text += "\""+swfVersion+"\", \"expressInstall.swf\", flashvars, params, attributes);\n";
-	              output.text += "</script>\n";
-	            }
-	          }
-
-	          public function toClipboard():void {
-	            System.setClipboard(output.text.substring(0, output.text.length));
-	          }
-
 	          public function setWarnings(e:Event):void {
 	            warnings.text = player.getWarnings();
 	          }
@@ -362,11 +334,8 @@
 
 	<mx:Panel title="FlMML" width="100%" height="100%"
 	          paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
-
-	  <mx:TabNavigator id="tn"  width="100%" height="100%"
-	                   paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4"
-	                   change="setHTML();">
-	    <mx:VBox label="MML">
+	    <mx:VBox label="MML" width="100%" height="100%"
+	                   paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
 	      <mx:VDividedBox width="100%" height="100%" backgroundColor="#dddddd">
 	        <mx:TextArea id="input" width="100%" height="2%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
 			<mx:TextArea id="pianorollcontainer" width="100%" height="2%"></mx:TextArea>
@@ -429,51 +398,6 @@
 	      </mx:Box>
 	      <flmml:FlMML id="player" />
 	    </mx:VBox>
-
-	    <mx:VBox label="HTML">
-	      <mx:Text htmlText="&lt;u&gt;&lt;a href=&quot;http://blog.deconcept.com/swfobject/&quot;&gt;SWFObject 2.0&lt;/a&gt;&lt;/u&gt; is required."/>
-	      <mx:TextArea id="output" width="100%" height="100%" fontSize="14" editable="false">
-	        <mx:text>
-	        </mx:text>
-	      </mx:TextArea>
-	      <mx:Grid>
-	        <mx:GridRow>
-	          <mx:GridItem>
-	            <mx:Text text="jsName" />
-	          </mx:GridItem>
-	          <mx:GridItem>
-	            <mx:TextInput id="jsName" text="swfobject.js" change="setHTML();" width="100%"/>
-	          </mx:GridItem>
-	        </mx:GridRow>
-	        <mx:GridRow>
-	          <mx:GridItem>
-	            <mx:Text text="swfName" />
-	          </mx:GridItem>
-	          <mx:GridItem>
-	            <mx:TextInput id="swfName" text="flmml.swf" change="setHTML();" width="100%"/>
-	          </mx:GridItem>
-	        </mx:GridRow>
-	        <mx:GridRow>
-	          <mx:GridItem>
-	            <mx:Text text="width" />
-	          </mx:GridItem>
-	          <mx:GridItem>
-	            <mx:Box direction="horizontal">
-	              <mx:NumericStepper id="swfWidth" minimum="320" maximum="1600"
-	                                 stepSize="1" value="480" change="setHTML();"/>
-	              <mx:Text text="height" />
-	              <mx:NumericStepper id="swfHeight" minimum="160" maximum="1200"
-	                                 stepSize="1" value="320" change="setHTML();"/>
-	              <mx:Text text="bgColor" />
-	              <mx:ColorPicker id="swfBackground" showTextField="true" selectedColor="0xb2bfc6" change="setHTML();"/>
-	            </mx:Box>
-	          </mx:GridItem>
-	        </mx:GridRow>
-	      </mx:Grid>
-	      <mx:Button id="clipButton" label="setClipboard" click="toClipboard();"/>
-	    </mx:VBox>
-
-	  </mx:TabNavigator>
 	</mx:Panel>
 
 </mx:Application>
