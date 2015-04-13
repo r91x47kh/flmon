@@ -37,7 +37,6 @@
 				
 				protected var m_timer:Timer;
 			  
-			  
 				// 定数たち
 				
 				// Sprite製UI部品たち
@@ -50,7 +49,36 @@
 				private var frameCounter:uint = 0;
 				
 				// 再生情報取得用変数たち
+				/** MSequencerインスタンスへの参照 */
 				private var _sequencer_ref:MSequencer = null;
+				/** テンポ境界における「再生位置[ms]」「再生位置[tick]」「後続のテンポ」の情報の列 */
+				private var _tempoEntries_ref:Array;
+				/** 再生位置[ms]に対応する再生位置[tick]を返す。*/
+				private var _msToTick:Function = function(ms:Number):Number {
+					var i:uint; // for用
+					var len:uint; // for
+					
+					if (ms <= 0.0) return 0.0; // 変な入力に対処
+					
+					//trace(_tempoEntries_ref);
+					//trace(_tempoEntries_ref[0]);
+					//trace(_tempoEntries_ref[0]["ms"]);
+					//trace(_tempoEntries_ref[0]["tick"]);
+					//trace(_tempoEntries_ref[0]["tempo"]);
+					//trace(2)
+					len = _tempoEntries_ref.length;
+					for (i = 0 ; i < len ; i++ ) { // tempo boundary entry を順次走査
+						// [!!!] 同じ再生位置[tick]に tenpo boundary entry が2つ以上あるケースに注意 [!!!]
+
+						// 「与えられた再生位置[ms]におけるテンポ」と、「その直前のテンポ境界の再生位置[tick]」を取得する
+						if (ms <= _tempoEntries_ref[i]["ms"]) { // 初めて再生位置[ms]の大きなエントリに遭遇したら（ここは < でも <= でも結果は変わらない）
+							return _tempoEntries_ref[i - 1]["tick"] + (ms - _tempoEntries_ref[i - 1]["ms"]) * (_tempoEntries_ref[i - 1]["tempo"] / 60.0 / 1000.0 * 96.0);
+						}
+					}
+					
+					// 与えられた再生位置[ms]が全てのテンポ境界よりも後にあった場合
+					return _tempoEntries_ref[len - 1]["tick"] + (ms - _tempoEntries_ref[len - 1]["ms"]) * (_tempoEntries_ref[len - 1]["tempo"] / 60.0 / 1000.0 * 96.0);
+			};
 				
 				// キー入力状態
 				private var _isKeyPressed:Object = new Object(); // _isKeyPressed[Keyboard.XX] にキーの押下状態を保持
@@ -171,9 +199,7 @@
 														{
 															var positionXInPixel:Number;
 															{
-																positionXInPixel =
-																	Number(PianoRoll.BEAT_WIDTH)
-																	* (_sequencer_ref.getSoundChannel().position/*<-ms*/ * (((150.0/*<-beat/m*/ / 60.0)/*<-beat/s*/ / 1000.0)/*<-beat/ms*/));
+																positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(_sequencer_ref.getSoundChannel().position) / 96.0);
 															}
 															
 															rootSp_PRoll.playingPositionBarLayer_ref.graphics.moveTo(positionXInPixel, 0);
@@ -264,11 +290,11 @@
 						playButton.label = "Pause";
 
 						var tracks:Array;
-						{
+						{ // tracks を初期化（その過程で MML インスタンスと MSequencer インスタンスを取得）
 							var sequencer:MSequencer;
-							{
+							{ // MSequencer インスタンスを取得
 								var mml:MML;
-								{
+								{ // MML インスタンスを取得
 									mml = player.getMML();
 								}
 								
@@ -278,7 +304,6 @@
 							
 							tracks = sequencer.getTrackArr();
 						}
-						
 						/*{ // MEvent 列をダンプ
 							len = tracks.length;
 							for (i = 0 ; i < len ; i++ ) {
@@ -287,68 +312,142 @@
 								trace("\n")
 							}
 						}*/
-						
-						_rootSp_PRoll_ref.itemLayer_ref.graphics.clear();
-						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
-							len2 = tracks.length;
-							for (j = 0 ; j < len2 ; j++ ) {
-								eventsOfTrack = tracks[j].getEvents();
+						{ // tempo boundary entry(= テンポ境界の情報)の列を MEvent.TEMPO イベントの列から生成
+							var tempoBoundaryEntries:Array; // tempo boundary entry(= テンポ境界の情報)の列
+							{
+								var eventsOfTempoTrack:Array = tracks[0].getEvents();
+								// trace("[track " + 0 + "]"); // テンポトラックのMEvent列をダンプ
+								// trace(tracks[0].getEventsStr());
+								// trace("\n");
 								
-								{
-									var pianoRollItemArr:Array;
-									{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
-										pianoRollItemArr = new Array();
-										{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
-											len = eventsOfTrack.length;
-											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-												e = eventsOfTrack[i];
-												if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
-												switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
-													case MStatus.NOTE_ON:
-														item = new PianoRollItem();
-														item.startPosInTick = e.getTick();
-														item.startPitch = e.getNoteNo()*100;
-														item.velocity = e.getVelocity();
-														break;
-													case MStatus.NOTE_OFF:
-														item.endPosInTick = e.getTick();
-														pianoRollItemArr.push(item);
-														break;
-													case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
-													default:
-														break;
+								tempoBoundaryEntries = new Array();
+								{ // テンポ境界における「再生位置[tick]」「後続のテンポ」を取得
+									//trace(eventsOfTempoTrack.length);
+									len = eventsOfTempoTrack.length;
+									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+										e = eventsOfTempoTrack[i];
+										if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
+										switch(e.getStatus()) {
+											case MStatus.TEMPO:
+												//trace(i);
+												var tempoBoundaryEntry:Object;
+												{
+													tempoBoundaryEntry = new Object();
+													tempoBoundaryEntry["ms"] = 0.0; // 一応初期化しておく
+													tempoBoundaryEntry["tick"] = e.getTick();
+													tempoBoundaryEntry["tempo"] = e.getTempo();
+												}
+												
+												//trace(tempoBoundaryEntry);
+												tempoBoundaryEntries.push(tempoBoundaryEntry);
+												break;
+											default:
+												break;
+										}
+									}
+									if (tempoBoundaryEntries.length == 0) { // テンポトラックにTEMPOイベントが全くなくて tempo boundary entry 列が空列になった場合
+										// デフォルトのテンポを持った tempo boundary entry を1個仕込む（これを入れないとテンポ境界情報が全くなくなるためバグる）
+										var tempoBoundaryEntry2:Object;
+										{
+											tempoBoundaryEntry2 = new Object();
+											tempoBoundaryEntry2["ms"] = 0.0;
+											tempoBoundaryEntry2["tick"] = 0;
+											tempoBoundaryEntry2["tempo"] = 120.0;
+										}
+										
+										tempoBoundaryEntries.push(tempoBoundaryEntry2);
+									}
+								}
+								{ // 各テンポ境界における「再生位置[tick]」「後続のテンポ」から、各テンポ境界における「再生位置[ms]」を計算
+									len = tempoBoundaryEntries.length;
+									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+										if (i == 0) {
+											tempoBoundaryEntries[0]["ms"] = 0.0; // 特例
+											trace("ms: "+tempoBoundaryEntries[i]["ms"]);
+											trace("tick: "+tempoBoundaryEntries[i]["tick"]);
+											trace("tempo: "+tempoBoundaryEntries[i]["tempo"]);
+											continue;
+										}else {
+											// 前のエントリの ms, tick, tempo と現在のエントリの tick を使って、現在のエントリの ms を計算
+											tempoBoundaryEntries[i]["ms"]
+												= tempoBoundaryEntries[i - 1]["ms"]
+												   + (tempoBoundaryEntries[i]["tick"] - tempoBoundaryEntries[i - 1]["tick"]) /* [tick] */
+												   / 96.0 /* [tick/beat] */
+												   / tempoBoundaryEntries[i - 1]["tempo"] /* [beat/min] */
+												   * 60000.0 /* [ms/min] */;
+											trace("ms: "+tempoBoundaryEntries[i]["ms"]);
+											trace("tick: "+tempoBoundaryEntries[i]["tick"]);
+											trace("tempo: "+tempoBoundaryEntries[i]["tempo"]);
+										}
+									}
+								}
+							}
+							_tempoEntries_ref = tempoBoundaryEntries; // 参照のプール
+							
+							// tempoBoundaryEntries はここでは使わない。_tempoEntries_ref　に入れたらここでは用済み
+						}
+						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
+							_rootSp_PRoll_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
+							{
+								len2 = tracks.length;
+								for (j = 0 ; j < len2 ; j++ ) {
+									eventsOfTrack = tracks[j].getEvents();
+									
+									{
+										var pianoRollItemArr:Array;
+										{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
+											pianoRollItemArr = new Array();
+											{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
+												len = eventsOfTrack.length;
+												for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+													e = eventsOfTrack[i];
+													if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
+													switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+														case MStatus.NOTE_ON:
+															item = new PianoRollItem();
+															item.startPosInTick = e.getTick();
+															item.startPitch = e.getNoteNo()*100;
+															item.velocity = e.getVelocity();
+															break;
+														case MStatus.NOTE_OFF:
+															item.endPosInTick = e.getTick();
+															pianoRollItemArr.push(item);
+															break;
+														case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
+														default:
+															break;
+													}
 												}
 											}
 										}
-									}
-									
-									//できたノート(= PianoRollItem)列をダンプ
-									//trace(pianoRollItemArr);
-									
-									_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
-									{
-										len = pianoRollItemArr.length;
-										for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-											var item2:PianoRollItem = pianoRollItemArr[i];
-											
-											{ // ノートを配置
-												_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
-													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
-													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-												);
-												_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
-													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
-													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-												);
+										
+										//できたノート(= PianoRollItem)列をダンプ
+										//trace(pianoRollItemArr);
+										
+										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
+										{
+											len = pianoRollItemArr.length;
+											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+												var item2:PianoRollItem = pianoRollItemArr[i];
+												
+												{ // ノートを配置
+													_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
+														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
+														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+													);
+													_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
+														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
+														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+													);
+												}
 											}
+						
 										}
-					
 									}
+									
 								}
-								
 							}
 						}
-					
 					}
 					else {
 						player.pause();
