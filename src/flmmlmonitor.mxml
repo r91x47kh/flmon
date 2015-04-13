@@ -85,6 +85,7 @@
 									rect.y += deltaY;
 									if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
 									if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
+									if (rect.x + rect.width > (PianoRoll.BEAT_WIDTH*4)*100) rect.x = (PianoRoll.BEAT_WIDTH*4)*100 - rect.width; // 画面右端以降にスクロールしようとしていたらクリッピング
 									if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
 								}
 								
