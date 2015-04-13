@@ -31,6 +31,10 @@ package com.txt_nifty.sketch.flmml {
 
         protected var m_sound:Sound;
         protected var m_soundChannel:SoundChannel;
+		/** この MSequencer インスタンスにおいて、直近の波形再生に使われた SoundChannel インスタンスを返す。 */
+		public function getSoundChannel():SoundChannel {
+			return m_soundChannel;
+		}
         protected var m_soundTransform:SoundTransform;
 		/** 波形生成用バッファ領域。m_buffer[0] と m_buffer[1] の2つがある。
 		 * 片方が再生中（オーディオデバイスにデータ送信中）の時、もう片方は波形生成中となる。 */

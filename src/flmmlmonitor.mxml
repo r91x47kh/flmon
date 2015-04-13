@@ -24,13 +24,16 @@
 				import flash.events.Event;
 				import flash.events.KeyboardEvent;
 				import flash.events.FocusEvent;
+				import flash.media.Sound;
 				import flash.ui.Keyboard;
 				import flash.geom.Rectangle;
-				import net.vt6f3ohw.flmon.PianoRoll;
 				import flash.display.Graphics;
 				import flash.display.Sprite;
 				import flash.text.TextField;
+				import flash.media.SoundChannel;
+				import net.vt6f3ohw.flmon.PianoRoll;
 				import net.vt6f3ohw.flmon.PianoRollItem;
+				import net.vt6f3ohw.flmon.Util;
 				
 				protected var m_timer:Timer;
 			  
@@ -39,11 +42,15 @@
 				
 				// Sprite製UI部品たち
 				private var _rootSp_PRoll_ref:PianoRoll; // root となる Sprite
-					private var _text_ref:TextField;
+					private var _frameCounterText_ref:TextField;
+					private var _soundChannelPositionText_ref:TextField;
 				private var _mask_PRoll_ref:Sprite; // マスク
 				
 				// カウンタたち
 				private var frameCounter:uint = 0;
+				
+				// 再生情報取得用変数たち
+				private var _sequencer_ref:MSequencer = null;
 				
 				// キー入力状態
 				private var _isKeyPressed:Object = new Object(); // _isKeyPressed[Keyboard.XX] にキーの押下状態を保持
@@ -103,21 +110,41 @@
 								{ // rootSp_PRoll の初期化
 									rootSp_PRoll = new PianoRoll();
 									rootSp_PRoll.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
-									{ // rootSp_PRoll に子Sprite （テキスト）を追加
-										var text:TextField;
+									{ // rootSp_PRoll に子Sprite （フレームカウントを表示するTextField）を追加
+										var frameCounterText:TextField;
 										{
-											text = new TextField();
-											text.x = 20;
-											text.y = 20;
+											frameCounterText = new TextField();
+											frameCounterText.x = 20;
+											frameCounterText.y = 20;
 										}
-										_text_ref = text; // 参照のプール
+										_frameCounterText_ref = frameCounterText; // 参照のプール
 										
-										rootSp_PRoll.addChild(text);
+										rootSp_PRoll.addChild(frameCounterText);
+									}
+									{ // rootSp_PRoll に子Sprite （再生位置を表示するTextField）を追加
+										var soundChannelPositionText:TextField;
+										{
+											soundChannelPositionText = new TextField();
+											soundChannelPositionText.x = 20;
+											soundChannelPositionText.y = 60;
+										}
+										_soundChannelPositionText_ref = soundChannelPositionText; // 参照のプール
+										
+										rootSp_PRoll.addChild(soundChannelPositionText);
 									}
 									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
-										//_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
-										_text_ref.text = (++frameCounter).toString();
-										
+										{ // フレームカウント文字列を更新
+											_frameCounterText_ref.text = (++frameCounter).toString();
+										}
+										{ // 再生位置文字列を更新
+											if (_sequencer_ref != null) {
+												//trace(Util.getInstanceID(_sequencer_ref.getSoundChannel()));
+												
+												// ここ、ちゃんと毎回 _sequencer_ref.getSoundChannel() しないと
+												// 「position がずっと変化しない SoundChannel インスタンス」に遭遇するので注意（原因不明）
+												_soundChannelPositionText_ref.text = _sequencer_ref.getSoundChannel().position.toString();
+											}
+										}
 										{ // ピアノロールのスクロール位置を更新											
 											{
 												var isScrolled:Boolean = false; // scrollRect が変化したかどうかを格納するBoolean
@@ -130,6 +157,29 @@
 												
 												// scrollRect が変化していたら Event.SCROLL イベントを dispatch
 												if(isScrolled){ rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); }
+											}
+										}
+										{ // 再生位置バーを更新
+											rootSp_PRoll.playingPositionBarLayer_ref.graphics.clear();
+											if (_sequencer_ref != null) { // 一応nullチェック
+												var soundChannel:SoundChannel = _sequencer_ref.getSoundChannel();
+												
+												if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) { // 再生中かポーズ中のときのみ再生位置バーを表示
+													if(soundChannel != null){ // 一応nullチェック
+														rootSp_PRoll.playingPositionBarLayer_ref.graphics.lineStyle(4, 0x333333, 0.5);
+														{
+															var positionXInPixel:Number;
+															{
+																positionXInPixel =
+																	Number(PianoRoll.BEAT_WIDTH)
+																	* (_sequencer_ref.getSoundChannel().position/*<-ms*/ * (((150.0/*<-beat/m*/ / 60.0)/*<-beat/s*/ / 1000.0)/*<-beat/ms*/));
+															}
+															
+															rootSp_PRoll.playingPositionBarLayer_ref.graphics.moveTo(positionXInPixel, 0);
+															rootSp_PRoll.playingPositionBarLayer_ref.graphics.lineTo(positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
+														}
+													}
+												}
 											}
 										}
 									});
@@ -211,98 +261,99 @@
 						if (player.isPaused()) m_timer.start(); // 1秒ごとに再生位置表示を更新するタイマーを起動
 						player.play(input.text);
 						playButton.label = "Pause";
+
+						var tracks:Array;
+						{
+							var sequencer:MSequencer;
+							{
+								var mml:MML;
+								{
+									mml = player.getMML();
+								}
+								
+								sequencer = mml.getSequencer();
+							}
+							_sequencer_ref = sequencer;
+							
+							tracks = sequencer.getTrackArr();
+						}
+						
+						/*{ // MEvent 列をダンプ
+							len = tracks.length;
+							for (i = 0 ; i < len ; i++ ) {
+								trace("[track " + i + "]");
+								trace(tracks[i].getEventsStr()); // デバッグ用
+								trace("\n")
+							}
+						}*/
+						
+						_rootSp_PRoll_ref.itemLayer_ref.graphics.clear();
+						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
+							len2 = tracks.length;
+							for (j = 0 ; j < len2 ; j++ ) {
+								eventsOfTrack = tracks[j].getEvents();
+								
+								{
+									var pianoRollItemArr:Array;
+									{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
+										pianoRollItemArr = new Array();
+										{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
+											len = eventsOfTrack.length;
+											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+												e = eventsOfTrack[i];
+												if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
+												switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+													case MStatus.NOTE_ON:
+														item = new PianoRollItem();
+														item.startPosInTick = e.getTick();
+														item.startPitch = e.getNoteNo()*100;
+														item.velocity = e.getVelocity();
+														break;
+													case MStatus.NOTE_OFF:
+														item.endPosInTick = e.getTick();
+														pianoRollItemArr.push(item);
+														break;
+													case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
+													default:
+														break;
+												}
+											}
+										}
+									}
+									
+									//できたノート(= PianoRollItem)列をダンプ
+									//trace(pianoRollItemArr);
+									
+									_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
+									{
+										len = pianoRollItemArr.length;
+										for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+											var item2:PianoRollItem = pianoRollItemArr[i];
+											
+											{ // ノートを配置
+												_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
+													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
+													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+												);
+												_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
+													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
+													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+												);
+											}
+										}
+					
+									}
+								}
+								
+							}
+						}
+					
 					}
 					else {
 						player.pause();
 						playButton.label = "Play";
 						m_timer.stop();
 					}
-
-					var tracks:Array;
-					{
-						var sequencer:MSequencer;
-						{
-							var mml:MML;
-							{
-								mml = player.getMML();
-							}
-							
-							sequencer = mml.getSequencer();
-						}
-						
-						tracks = sequencer.getTrackArr();
-					}
-					
-					/*{ // MEvent 列をダンプ
-						len = tracks.length;
-						for (i = 0 ; i < len ; i++ ) {
-							trace("[track " + i + "]");
-							trace(tracks[i].getEventsStr()); // デバッグ用
-							trace("\n")
-						}
-					}*/
-					
-					_rootSp_PRoll_ref.itemLayer_ref.graphics.clear();
-					{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
-						len2 = tracks.length;
-						for (j = 0 ; j < len2 ; j++ ) {
-							eventsOfTrack = tracks[j].getEvents();
-							
-							{
-								var pianoRollItemArr:Array;
-								{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
-									pianoRollItemArr = new Array();
-									{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
-										len = eventsOfTrack.length;
-										for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-											e = eventsOfTrack[i];
-											if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
-											switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
-												case MStatus.NOTE_ON:
-													item = new PianoRollItem();
-													item.startPosInTick = e.getTick();
-													item.startPitch = e.getNoteNo()*100;
-													item.velocity = e.getVelocity();
-													break;
-												case MStatus.NOTE_OFF:
-													item.endPosInTick = e.getTick();
-													pianoRollItemArr.push(item);
-													break;
-												case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
-												default:
-													break;
-											}
-										}
-									}
-								}
-								
-								//できたノート(= PianoRollItem)列をダンプ
-								//trace(pianoRollItemArr);
-								
-								_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
-								{
-									len = pianoRollItemArr.length;
-									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-										var item2:PianoRollItem = pianoRollItemArr[i];
-										
-										{ // ノートを配置
-											_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
-												Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
-												Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-											);
-											_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
-												Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
-												Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-											);
-										}
-									}
-				
-								}
-							}
-							
-						}
-					}
-					
 				}
 
 	          public function stop():void {

@@ -22,6 +22,11 @@ package net.vt6f3ohw.flmon {
 		public function get itemLayer_ref():Shape {
 			return _itemLayer_ref;
 		}
+		/** 再生位置バーレイヤ */
+		private var _playingPositionBarLayer_ref:Shape;
+		public function get playingPositionBarLayer_ref():Shape {
+			return _playingPositionBarLayer_ref;
+		}
 		
 		public function PianoRoll() {
 			super();
@@ -83,7 +88,16 @@ package net.vt6f3ohw.flmon {
 				
 				this.addChild(itemLayer);
 			}
-			
+			{ // 子Shape （再生位置バーレイヤ）を追加
+				var playingPositionBarLayer:Shape;
+				{
+					playingPositionBarLayer = new Shape();
+					playingPositionBarLayer.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
+				}
+				_playingPositionBarLayer_ref = playingPositionBarLayer; // 参照のプール
+				
+				this.addChild(playingPositionBarLayer);
+			}
 		}
 		
 	}
