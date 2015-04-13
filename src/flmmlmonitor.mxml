@@ -69,6 +69,21 @@
 							;
 						}
 						{ // ピアノロール部分のUIの準備
+							/** [ユーティリティ関数] ピアノロールを (deltaX, deltaY) だけスクロールする*/
+							var scroll:Function = function(deltaX:int, deltaY:int):void { // 共通する処理をまとめた関数
+								var rect:Rectangle;
+								{
+									rect = _rootSp_PRoll_ref.scrollRect.clone();
+									rect.x += deltaX;
+									rect.y += deltaY;
+									if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
+									if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
+									if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
+								}
+								
+								_rootSp_PRoll_ref.scrollRect = rect;
+							};
+							
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
 								var mask_PRoll:Sprite;
 								{ // mask_PRoll の初期化
@@ -87,7 +102,6 @@
 								var rootSp_PRoll:PianoRoll; // mx:Image の中で root となる Sprite
 								{ // rootSp_PRoll の初期化
 									rootSp_PRoll = new PianoRoll();
-									rootSp_PRoll.focusRect = true;
 									rootSp_PRoll.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
 									{ // rootSp_PRoll に子Sprite （テキスト）を追加
 										var text:TextField;
@@ -104,22 +118,7 @@
 										//_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
 										_text_ref.text = (++frameCounter).toString();
 										
-										{ // ピアノロールのスクロール位置を更新
-											/** ピアノロールを (deltaX, deltaY) だけスクロールする*/
-											var scroll:Function = function(deltaX:int, deltaY:int):void { // 共通する処理をまとめた関数
-												var rect:Rectangle;
-												{
-													rect = _rootSp_PRoll_ref.scrollRect.clone();
-													rect.x += deltaX;
-													rect.y += deltaY;
-													if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
-													if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
-													if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
-												}
-												
-												rootSp_PRoll.scrollRect = rect;
-											};
-											
+										{ // ピアノロールのスクロール位置を更新											
 											{
 												var isScrolled:Boolean = false; // scrollRect が変化したかどうかを格納するBoolean
 												
@@ -174,6 +173,12 @@
 							});
 							pianoroll.addEventListener(KeyboardEvent.KEY_UP, function(e2:KeyboardEvent):void {
 								_isKeyPressed[e2.keyCode] = false;
+							});
+							pianoroll.addEventListener(MouseEvent.MOUSE_WHEEL, function(e3:MouseEvent):void {
+								var delta:int = e3.delta; // ホイールの回転量
+
+								scroll(0, PianoRoll.SEMITONE_HEIGHT * ( -delta )); // (半音の縦幅)*(ホイールの回転量)ずつスクロール（スクロールの向きは指を動かす方向と同じ）
+								rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 							});
 							// TODO: キー押下状態中にフォーカスがどっか行ったときに備えて FocusEvent.OUT 時にキー押下状態を全部 false にするコードを追加
 							// pianoroll.addEventListener(FocusEvent.FOCUS_OUT, function(e3:FocusEvent):void {
