@@ -18,9 +18,13 @@
 				import com.txt_nifty.sketch.flmml.MML;
 				import com.txt_nifty.sketch.flmml.MMLEvent;
 				import com.txt_nifty.sketch.flmml.MSequencer;
+				import flash.events.Event;
+				import flash.events.KeyboardEvent;
+				import flash.events.FocusEvent;
+				import flash.ui.Keyboard;
+				import flash.geom.Rectangle;
 				import net.vt6f3ohw.flmon.PianoRoll;
 				import flash.display.Graphics;
-				import flash.display.Shape;
 				import flash.display.Sprite;
 				import flash.text.TextField;
 				import net.vt6f3ohw.flmon.PianoRollItem;
@@ -52,21 +56,38 @@
 					m_timer.addEventListener(TimerEvent.TIMER, onSecond);
 
 					{ // UIの用意
-						{ // 小節数表示部分のUIの投入
+						{ // 小節数表示部分のUIの準備
 							;
 						}
-						{ // 鍵盤部分のUIの投入
+						{ // 鍵盤部分のUIの準備
 							;
 						}
-						{ // ピアノロール部分のUIの投入
+						{ // ピアノロール部分のUIの準備
+							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
+								var mask_PRoll:Sprite;
+								{ // mask_PRoll の初期化
+									mask_PRoll = new Sprite();
+									mask_PRoll.cacheAsBitmap = true;
+									mask_PRoll.graphics.beginFill(0x000000);
+									mask_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+									mask_PRoll.graphics.endFill();
+								}
+								_mask_PRoll_ref = mask_PRoll;
+								
+								pianoroll.addChild(mask_PRoll); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+								pianoroll.mask = mask_PRoll;
+							}
 							{ // mx:Image の中に Sprite ツリーを投入
 								var rootSp_PRoll:PianoRoll; // mx:Image の中で root となる Sprite
 								{ // rootSp_PRoll の初期化
 									rootSp_PRoll = new PianoRoll();
-									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
-									{ // rootSp_PRoll 直下に背景矩形を描き込み
+									rootSp_PRoll.focusRect = true;
+									rootSp_PRoll.opaqueBackground = true;
+									rootSp_PRoll.cacheAsBitmap = true;
+									rootSp_PRoll.scrollRect = new Rectangle(0, 0, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
+									{ // 背景矩形を描画
 										rootSp_PRoll.graphics.beginFill(0xffffff);
-										rootSp_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+										rootSp_PRoll.graphics.drawRect(0, 0, (PianoRoll.BEAT_WIDTH*4)*100, PianoRoll.SEMITONE_HEIGHT*128);
 										rootSp_PRoll.graphics.endFill();
 									}
 									{ // rootSp_PRoll に子Sprite （テキスト）を追加
@@ -80,50 +101,87 @@
 										
 										rootSp_PRoll.addChild(text);
 									}
+									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
+										//_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
+										_text_ref.text = (++frameCounter).toString();
+									});
+									rootSp_PRoll.addEventListener(FocusEvent.FOCUS_IN, function(e3:FocusEvent):void {
+										trace(e3);
+									});
 								}
 								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
 								
 								pianoroll.addChild(rootSp_PRoll);
 							}
-							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-								var mask_PRoll:Sprite;
-								{ // mask_PRoll の初期化
-									mask_PRoll = new Sprite();
-									mask_PRoll.graphics.beginFill(0xffffff);
-									{
-										mask_PRoll.graphics.lineStyle(0, 0xff0000);
-										mask_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-									}
-									mask_PRoll.graphics.endFill();
+							pianoroll.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
+								{ // マスク矩形のサイズを更新
+									_mask_PRoll_ref.graphics.clear();
+									_mask_PRoll_ref.graphics.beginFill(0x000000);
+									_mask_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
+									_mask_PRoll_ref.graphics.endFill();
 								}
-								_mask_PRoll_ref = mask_PRoll;
-								
-								pianoroll.addChild(mask_PRoll); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
-								pianoroll.mask = mask_PRoll;
-							}
-						}
-					}
-				}
-				
-				private function _onEnterFrame(event:Event):void {
-					//_shape_ref.x++;
-					//_shape_ref.y++;
-					_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
-					_text_ref.text = (++frameCounter).toString();
-					
-					// TODO: onEnterFrame から画面サイズ変更イベントハンドラに移動
-					{ // ピアノロール部分のUIを更新
-						{ // 背景となる rect のサイズを更新
-							_rootSp_PRoll_ref.graphics.clear();
-							_rootSp_PRoll_ref.graphics.beginFill(0xffffff);
-							_rootSp_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-							_rootSp_PRoll_ref.graphics.endFill();
-						}
-						{ // マスクのサイズを更新
-							_mask_PRoll_ref.graphics.clear();
-							_mask_PRoll_ref.graphics.beginFill(0x000000);
-							_mask_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-							_mask_PRoll_ref.graphics.endFill();
+								{ // ピアノロールのビューポートのサイズを更新
+									var rect:Rectangle;
+									{
+										rect = _rootSp_PRoll_ref.scrollRect.clone();
+										rect.width = pianoroll.width;
+										rect.height = pianoroll.height;
+									}
+									
+									_rootSp_PRoll_ref.scrollRect = rect;
+								}
+							});
+							pianorollcontainer.focusEnabled = true;
+							pianorollcontainer.addEventListener(KeyboardEvent.KEY_DOWN, function(e2:KeyboardEvent):void {
+								switch(e2.keyCode) {
+									case Keyboard.UP:
+										{ // ピアノロールのスクロール位置を更新
+											var rect:Rectangle;
+											{
+												rect = _rootSp_PRoll_ref.scrollRect.clone();
+												rect.y -= 20;
+											}
+											
+											_rootSp_PRoll_ref.scrollRect = rect;
+										}
+										break;
+									case Keyboard.DOWN:
+										{ // ピアノロールのスクロール位置を更新
+											var rect2:Rectangle;
+											{
+												rect2 = _rootSp_PRoll_ref.scrollRect.clone();
+												rect2.y += 20;
+											}
+											
+											_rootSp_PRoll_ref.scrollRect = rect2;
+										}
+										break;
+									case Keyboard.LEFT:
+										{ // ピアノロールのスクロール位置を更新
+											var rect3:Rectangle;
+											{
+												rect3 = _rootSp_PRoll_ref.scrollRect.clone();
+												rect3.x -= 20;
+											}
+											
+											_rootSp_PRoll_ref.scrollRect = rect3;
+										}
+										break;
+									case Keyboard.RIGHT:
+										{ // ピアノロールのスクロール位置を更新
+											var rect4:Rectangle;
+											{
+												rect4 = _rootSp_PRoll_ref.scrollRect.clone();
+												rect4.x += 20;
+											}
+											
+											_rootSp_PRoll_ref.scrollRect = rect4;
+										}
+										break;
+									default:
+										break;
+								}
+							});
 						}
 					}
 				}
@@ -162,8 +220,12 @@
 
 				public function play():void {
 					var i:int; // for用
+					var j:int; // for用
 					var len:int; // for用
+					var len2:int; // for用
 					var e:MEvent; // for用
+					var eventsOfTrack:Array; // for用
+					var item:PianoRollItem;
 					
 					if (!player.isPlaying()) {
 						if (player.isPaused()) m_timer.start(); // 1秒ごとに再生位置表示を更新するタイマーを起動
@@ -201,49 +263,59 @@
 					}*/
 					
 					
-					{ // tracks[1] のノート( = PianoRollItem)の列を画面上に表示
-						var pianoRollItemArr:Array;
-						{ // tracks[1] の MEvent 列をノート( = PianoRollItem)の列に変換
-							pianoRollItemArr = new Array();
-							var events:Array = tracks[1].getEvents();
-							{
-								var item:PianoRollItem;
-								
-								len = events.length;
-								for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-									e = events[i];
-									switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
-										case MStatus.NOTE_ON:
-											item = new PianoRollItem();
-											item.startPosInTick = e.getTick();
-											item.startPitch = e.getNoteNo()*100;
-											item.velocity = e.getVelocity();
-											break;
-										case MStatus.NOTE_OFF:
-											item.endPosInTick = e.getTick();
-											pianoRollItemArr.push(item);
-											break;
-										default:
-											break;
+					len2 = tracks.length;
+					for (j = 0 ; j < len2 ; j++ ) { // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
+						eventsOfTrack = tracks[j].getEvents();
+						
+						{
+							var pianoRollItemArr:Array;
+							{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
+								pianoRollItemArr = new Array();
+								{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
+									len = eventsOfTrack.length;
+									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+										e = eventsOfTrack[i];
+										switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+											case MStatus.NOTE_ON:
+												item = new PianoRollItem();
+												item.startPosInTick = e.getTick();
+												item.startPitch = e.getNoteNo()*100;
+												item.velocity = e.getVelocity();
+												break;
+											case MStatus.NOTE_OFF:
+												item.endPosInTick = e.getTick();
+												pianoRollItemArr.push(item);
+												break;
+											case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
+											default:
+												break;
+										}
 									}
 								}
 							}
+							
+							trace(pianoRollItemArr);
+							_rootSp_PRoll_ref.shape2_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
+							{
+								len = pianoRollItemArr.length;
+								for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+									var item2:PianoRollItem = pianoRollItemArr[i];
+									
+									{ // ノートを配置
+										_rootSp_PRoll_ref.shape2_ref.graphics.moveTo(
+											Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
+											Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+										);
+										_rootSp_PRoll_ref.shape2_ref.graphics.lineTo(
+											Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
+											Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+										);
+									}
+								}
+			
+							}
 						}
 						
-						trace(pianoRollItemArr);
-						_rootSp_PRoll_ref.shape2_ref.graphics.lineStyle(4, 91*0x10000 + 155*0x100 + 213);
-						{
-							len = pianoRollItemArr.length;
-							for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-								var item2:PianoRollItem = pianoRollItemArr[i];
-								
-								{
-									_rootSp_PRoll_ref.shape2_ref.graphics.moveTo(Number(48)*(Number(item2.startPosInTick)/96.0), Number(PianoRoll.SEMITONE_HEIGHT)*(128.0-(Number(item2.startPitch/*+4800*/)/100.0)));
-									_rootSp_PRoll_ref.shape2_ref.graphics.lineTo(Number(48)*(Number(item2.endPosInTick)/96.0), Number(PianoRoll.SEMITONE_HEIGHT)*(128.0-(Number(item2.startPitch/*+4800*/)/100.0)));
-								}
-							}
-		
-						}
 					}
 					
 				}
@@ -289,7 +361,8 @@
 	    <mx:VBox label="MML">
 	      <mx:VDividedBox width="100%" height="100%" backgroundColor="#dddddd">
 	        <mx:TextArea id="input" width="100%" height="20%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
-			<mx:Grid width="100%" height="70%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
+			<mx:TextArea id="pianorollcontainer" width="100%" height="10%"></mx:TextArea>
+			<mx:Grid width="100%" height="60%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
 				<mx:GridRow width="100%">
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>

@@ -25,9 +25,10 @@ package net.vt6f3ohw.flmon {
 				var shape2:Shape;
 				{
 					shape2 = new Shape();
+					shape2.cacheAsBitmap = true;
 					{ // 1拍ごとに線を引く
 						shape2.graphics.lineStyle(0.4, 0xeeeeee);
-						for (i = 0 ; i < 40 ; i++ ) {
+						for (i = 0 ; i < 400 ; i++ ) {
 							shape2.graphics.moveTo(BEAT_WIDTH*i, 0);
 							shape2.graphics.lineTo(BEAT_WIDTH*i, SEMITONE_HEIGHT*128);
 						}
@@ -41,13 +42,13 @@ package net.vt6f3ohw.flmon {
 					}
 					{ // 1小節ごとに線を引く
 						shape2.graphics.lineStyle(3, 0xcccccc);
-						for (i = 0 ; i < 10 ; i++ ) {
+						for (i = 0 ; i < 100 ; i++ ) {
 							shape2.graphics.moveTo((BEAT_WIDTH*4)*i, 0);
 							shape2.graphics.lineTo((BEAT_WIDTH*4)*i, SEMITONE_HEIGHT*128);
 						}
 					}
 					{ // C に線を引く
-						shape2.graphics.lineStyle(2, 91*0x10000 + 155*0x100 + 213);
+						shape2.graphics.lineStyle(1, 91*0x10000 + 155*0x100 + 213);
 						for (i = 0 ; i < 10 ; i++ ) {
 							shape2.graphics.moveTo(0, SEMITONE_HEIGHT*(8 + 12*i));
 							shape2.graphics.lineTo(10000, SEMITONE_HEIGHT*(8 + 12*i));
