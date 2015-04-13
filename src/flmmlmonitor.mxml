@@ -2,7 +2,9 @@
 
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
                 xmlns:flmml="com.txt_nifty.sketch.flmml.*"
-                layout="absolute" creationComplete="init();">
+                layout="absolute"
+				frameRate="60"
+				creationComplete="init();">
     <mx:Style>
         @namespace mx "http://www.adobe.com/2006/mxml";
         mx|TextArea {
@@ -41,6 +43,9 @@
 				
 				// カウンタたち
 				private var frameCounter:uint = 0;
+				
+				// キー入力状態
+				private var _isKeyPressed:Object = new Object(); // _isKeyPressed[Keyboard.XX] にキーの押下状態を保持
 
 				public function init():void {
 					var i:int; // for用
@@ -104,9 +109,28 @@
 									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
 										//_text_ref.text = pianoroll.width.toString() + ", " + pianoroll.height.toString();
 										_text_ref.text = (++frameCounter).toString();
-									});
-									rootSp_PRoll.addEventListener(FocusEvent.FOCUS_IN, function(e3:FocusEvent):void {
-										trace(e3);
+										
+										{ // ピアノロールのスクロール位置を更新
+											/** ピアノロールを (deltaX, deltaY) だけスクロールする*/
+											var scroll:Function = function(deltaX:int, deltaY:int):void { // 共通する処理をまとめた関数
+												var rect:Rectangle;
+												{
+													rect = _rootSp_PRoll_ref.scrollRect.clone();
+													rect.x += deltaX;
+													rect.y += deltaY;
+													if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
+													if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
+													if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
+												}
+												
+												rootSp_PRoll.scrollRect = rect;
+											};
+											
+											if (_isKeyPressed[Keyboard.UP] != undefined && _isKeyPressed[Keyboard.UP]) { scroll(0, -20); }
+											if (_isKeyPressed[Keyboard.DOWN] != undefined && _isKeyPressed[Keyboard.DOWN]) { scroll(0, 20); }
+											if (_isKeyPressed[Keyboard.LEFT] != undefined && _isKeyPressed[Keyboard.LEFT]) { scroll(-20, 0); }
+											if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { scroll(20, 0); }
+										}
 									});
 								}
 								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
@@ -133,55 +157,15 @@
 							});
 							pianorollcontainer.focusEnabled = true;
 							pianorollcontainer.addEventListener(KeyboardEvent.KEY_DOWN, function(e2:KeyboardEvent):void {
-								switch(e2.keyCode) {
-									case Keyboard.UP:
-										{ // ピアノロールのスクロール位置を更新
-											var rect:Rectangle;
-											{
-												rect = _rootSp_PRoll_ref.scrollRect.clone();
-												rect.y -= 20;
-											}
-											
-											_rootSp_PRoll_ref.scrollRect = rect;
-										}
-										break;
-									case Keyboard.DOWN:
-										{ // ピアノロールのスクロール位置を更新
-											var rect2:Rectangle;
-											{
-												rect2 = _rootSp_PRoll_ref.scrollRect.clone();
-												rect2.y += 20;
-											}
-											
-											_rootSp_PRoll_ref.scrollRect = rect2;
-										}
-										break;
-									case Keyboard.LEFT:
-										{ // ピアノロールのスクロール位置を更新
-											var rect3:Rectangle;
-											{
-												rect3 = _rootSp_PRoll_ref.scrollRect.clone();
-												rect3.x -= 20;
-											}
-											
-											_rootSp_PRoll_ref.scrollRect = rect3;
-										}
-										break;
-									case Keyboard.RIGHT:
-										{ // ピアノロールのスクロール位置を更新
-											var rect4:Rectangle;
-											{
-												rect4 = _rootSp_PRoll_ref.scrollRect.clone();
-												rect4.x += 20;
-											}
-											
-											_rootSp_PRoll_ref.scrollRect = rect4;
-										}
-										break;
-									default:
-										break;
-								}
+								_isKeyPressed[e2.keyCode] = true;
 							});
+							pianorollcontainer.addEventListener(KeyboardEvent.KEY_UP, function(e2:KeyboardEvent):void {
+								_isKeyPressed[e2.keyCode] = false;
+							});
+							// TODO: キー押下状態中にフォーカスがどっか行ったときに備えて FocusEvent.OUT 時にキー押下状態を全部 false にするコードを追加
+							// pianorollcontainer.addEventListener(FocusEvent.FOCUS_OUT, function(e3:FocusEvent):void {
+							// 	trace(e3);
+							// });
 						}
 					}
 				}
@@ -263,59 +247,65 @@
 					}*/
 					
 					
-					len2 = tracks.length;
-					for (j = 0 ; j < len2 ; j++ ) { // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
-						eventsOfTrack = tracks[j].getEvents();
-						
-						{
-							var pianoRollItemArr:Array;
-							{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
-								pianoRollItemArr = new Array();
-								{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
-									len = eventsOfTrack.length;
-									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-										e = eventsOfTrack[i];
-										switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
-											case MStatus.NOTE_ON:
-												item = new PianoRollItem();
-												item.startPosInTick = e.getTick();
-												item.startPitch = e.getNoteNo()*100;
-												item.velocity = e.getVelocity();
-												break;
-											case MStatus.NOTE_OFF:
-												item.endPosInTick = e.getTick();
-												pianoRollItemArr.push(item);
-												break;
-											case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
-											default:
-												break;
+					_rootSp_PRoll_ref.itemLayer_ref.graphics.clear();
+					{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
+						len2 = tracks.length;
+						for (j = 0 ; j < len2 ; j++ ) {
+							eventsOfTrack = tracks[j].getEvents();
+							
+							{
+								var pianoRollItemArr:Array;
+								{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
+									pianoRollItemArr = new Array();
+									{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
+										len = eventsOfTrack.length;
+										for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+											e = eventsOfTrack[i];
+											if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
+											switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+												case MStatus.NOTE_ON:
+													item = new PianoRollItem();
+													item.startPosInTick = e.getTick();
+													item.startPitch = e.getNoteNo()*100;
+													item.velocity = e.getVelocity();
+													break;
+												case MStatus.NOTE_OFF:
+													item.endPosInTick = e.getTick();
+													pianoRollItemArr.push(item);
+													break;
+												case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
+												default:
+													break;
+											}
 										}
 									}
 								}
+								
+								//できたノート(= PianoRollItem)列をダンプ
+								//trace(pianoRollItemArr);
+								
+								_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
+								{
+									len = pianoRollItemArr.length;
+									for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+										var item2:PianoRollItem = pianoRollItemArr[i];
+										
+										{ // ノートを配置
+											_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
+												Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
+												Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+											);
+											_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
+												Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
+												Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+											);
+										}
+									}
+				
+								}
 							}
 							
-							trace(pianoRollItemArr);
-							_rootSp_PRoll_ref.shape2_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
-							{
-								len = pianoRollItemArr.length;
-								for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-									var item2:PianoRollItem = pianoRollItemArr[i];
-									
-									{ // ノートを配置
-										_rootSp_PRoll_ref.shape2_ref.graphics.moveTo(
-											Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
-											Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-										);
-										_rootSp_PRoll_ref.shape2_ref.graphics.lineTo(
-											Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
-											Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-										);
-									}
-								}
-			
-							}
 						}
-						
 					}
 					
 				}
@@ -360,9 +350,9 @@
 	                   change="setHTML();">
 	    <mx:VBox label="MML">
 	      <mx:VDividedBox width="100%" height="100%" backgroundColor="#dddddd">
-	        <mx:TextArea id="input" width="100%" height="20%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
-			<mx:TextArea id="pianorollcontainer" width="100%" height="10%"></mx:TextArea>
-			<mx:Grid width="100%" height="60%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
+	        <mx:TextArea id="input" width="100%" height="2%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
+			<mx:TextArea id="pianorollcontainer" width="100%" height="2%"></mx:TextArea>
+			<mx:Grid width="100%" height="94%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
 				<mx:GridRow width="100%">
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
@@ -380,7 +370,7 @@
 					<mx:GridItem width="100%" height="100%">
 						<!--ピアノロール--><mx:Image id="pianoroll" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
-					<mx:GridItem>
+					<mx:GridItem backgroundColor="#ffffff">
 						<mx:VScrollBar height="100%" />
 					</mx:GridItem>
 				</mx:GridRow>
@@ -388,14 +378,18 @@
 				<mx:GridRow width="100%">
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
-					<mx:GridItem>
-						<mx:HScrollBar width="100%" />
+					<mx:GridItem backgroundColor="#ffffff">
+					<mx:HScrollBar width="100%"
+										minScrollPosition="0" maxScrollPosition="0" scrollPosition="0"
+										pageSize="{pianoroll.width}"
+										lineScrollSize="50" pageScrollSize="100" 
+										repeatDelay="1000" repeatInterval="500" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
 				</mx:GridRow>
 			</mx:Grid>
-	        <mx:TextArea id="warnings" width="100%" height="10%" fontSize="10" editable="false">
+	        <mx:TextArea id="warnings" width="100%" height="2%" fontSize="10" editable="false">
 	          <mx:text></mx:text>
 	        </mx:TextArea>
 	      </mx:VDividedBox>

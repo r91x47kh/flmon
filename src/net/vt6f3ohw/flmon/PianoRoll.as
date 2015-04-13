@@ -9,11 +9,18 @@ package net.vt6f3ohw.flmon {
 		public static var BEAT_WIDTH:uint = 48;
 		/** 1半音あたりの高さ */
 		public static var SEMITONE_HEIGHT:uint = 12;
+		/** ピアノロールの高さ */
+		public static var PIANOROLL_HEIGHT:uint = SEMITONE_HEIGHT*128; // TODO: MChannel@FlMMLエンジン の frequencyMap の要素数に応じてこの値が動的に変わるようにする
 		
 		// 参照のプールたち
 		private var _shape2_ref:Shape;
 		public function get shape2_ref():Shape {
 			return _shape2_ref;
+		}
+		/** ノート(= PianoRollItem)レイヤ */
+		private var _itemLayer_ref:Shape;
+		public function get itemLayer_ref():Shape {
+			return _itemLayer_ref;
 		}
 		
 		public function PianoRoll() {
@@ -21,7 +28,7 @@ package net.vt6f3ohw.flmon {
 			
 			var i:uint; // for用
 
-			{ // rootSp_PRoll に子Sprite （線）を追加
+			{ // 子Sprite （線レイヤ）を追加
 				var shape2:Shape;
 				{
 					shape2 = new Shape();
@@ -58,6 +65,16 @@ package net.vt6f3ohw.flmon {
 				_shape2_ref = shape2; // 参照のプール
 				
 				this.addChild(shape2);
+			}
+			{ // 子Sprite （ノート(= PianoRollItem)レイヤ）を追加
+				var itemLayer:Shape;
+				{
+					itemLayer = new Shape();
+					itemLayer.cacheAsBitmap = true;
+				}
+				_itemLayer_ref = itemLayer; // 参照のプール
+				
+				this.addChild(itemLayer);
 			}
 			
 		}
