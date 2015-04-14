@@ -243,10 +243,10 @@
 																	var ACTIVATION_WIDTH:Number = PianoRoll.BEAT_WIDTH * 4; // 画面右端から何pixelの所をまたいだらオートスクロールするか
 																	
 																	trace("_positionXInPixel_prev = " + _positionXInPixel_prev + ", _positionXInPixel = " + _positionXInPixel);
-																	// 再生位置バーが画面上のある部分をまたいだらオートスクロール
+																	// 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点をまたいだらオートスクロール
 																	if (_positionXInPixel_prev < rootSp_PRoll.scrollRect.x + rootSp_PRoll.width - ACTIVATION_WIDTH
-																		&& rootSp_PRoll.scrollRect.x + rootSp_PRoll.width - ACTIVATION_WIDTH < _positionXInPixel) {
-																		trace("stepped over");
+																		&& rootSp_PRoll.scrollRect.x + rootSp_PRoll.width - ACTIVATION_WIDTH <= _positionXInPixel) { // 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点にピッタリ到達してしまう場合に対処して「<」ではなく「<=」にしておく
+																		//trace("stepped over");
 																		
 																		var DURATION_IN_FRAME:Number = 60.0; // 何フレームで動かすか
 																		for (i = 1.0 ; i <= DURATION_IN_FRAME ; i += 1.0) {
