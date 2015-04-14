@@ -58,6 +58,26 @@
 				private var _positionXInPixel_prev:Number; 
 				/** オートスクロールの際の毎フレームでのスクロール量を格納するキュー */
 				private var _absoluteScrollQueue:Array = new Array();
+				/** [ユーティリティ関数] ピアノロールを (x, y) にスクロールする*/
+				private var _absoluteScroll:Function = function(x:int, y:int):void {
+					var rect:Rectangle;
+					{
+						rect = _rootSp_PRoll_ref.scrollRect.clone();
+						rect.x = x;
+						rect.y = y;
+						if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
+						if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
+						if (rect.x + rect.width > (PianoRoll.BEAT_WIDTH*4)*100) rect.x = (PianoRoll.BEAT_WIDTH*4)*100 - rect.width; // 画面右端以降にスクロールしようとしていたらクリッピング
+						if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
+					}
+					
+					_rootSp_PRoll_ref.scrollRect = rect;
+				};
+				/** [ユーティリティ関数] ピアノロールを (deltaX, deltaY) だけスクロールする*/
+				private var _relativeScroll:Function = function(deltaX:int, deltaY:int):void {
+					_absoluteScroll(_rootSp_PRoll_ref.scrollRect.x + deltaX, _rootSp_PRoll_ref.scrollRect.y + deltaY);
+				};
+							
 				
 				// カウンタたち
 				private var frameCounter:uint = 0;
@@ -118,26 +138,6 @@
 							;
 						}
 						{ // ピアノロール部分のUIの準備
-							/** [ユーティリティ関数] ピアノロールを (x, y) にスクロールする*/
-							var absoluteScroll:Function = function(x:int, y:int):void {
-								var rect:Rectangle;
-								{
-									rect = _rootSp_PRoll_ref.scrollRect.clone();
-									rect.x = x;
-									rect.y = y;
-									if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
-									if (rect.y < 0) rect.y = 0; // 画面上端以降にスクロールしようとしていたらクリッピング
-									if (rect.x + rect.width > (PianoRoll.BEAT_WIDTH*4)*100) rect.x = (PianoRoll.BEAT_WIDTH*4)*100 - rect.width; // 画面右端以降にスクロールしようとしていたらクリッピング
-									if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
-								}
-								
-								_rootSp_PRoll_ref.scrollRect = rect;
-							};
-							/** [ユーティリティ関数] ピアノロールを (deltaX, deltaY) だけスクロールする*/
-							var relativeScroll:Function = function(deltaX:int, deltaY:int):void {
-								absoluteScroll(_rootSp_PRoll_ref.scrollRect.x + deltaX, _rootSp_PRoll_ref.scrollRect.y + deltaY);
-							};
-							
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
 								var mask_PRoll:Sprite;
 								{ // mask_PRoll の初期化
@@ -209,10 +209,10 @@
 												var isScrolled:Boolean = false; // scrollRect が変化したかどうかを格納するBoolean
 												
 												// 各キーが押下状態にあったらスクロール。また、オートスクロール中に左右キーが押された場合はオートスクロールを中断
-												if (_isKeyPressed[Keyboard.UP] != undefined && _isKeyPressed[Keyboard.UP]) { relativeScroll(0, -20); isScrolled = true; }
-												if (_isKeyPressed[Keyboard.DOWN] != undefined && _isKeyPressed[Keyboard.DOWN]) { relativeScroll(0, 20); isScrolled = true; }
-												if (_isKeyPressed[Keyboard.LEFT] != undefined && _isKeyPressed[Keyboard.LEFT]) { relativeScroll( -20, 0); isScrolled = true; _absoluteScrollQueue.length = 0; }
-												if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { relativeScroll(20, 0); isScrolled = true; _absoluteScrollQueue.length = 0; }
+												if (_isKeyPressed[Keyboard.UP] != undefined && _isKeyPressed[Keyboard.UP]) { _relativeScroll(0, -20); isScrolled = true; }
+												if (_isKeyPressed[Keyboard.DOWN] != undefined && _isKeyPressed[Keyboard.DOWN]) { _relativeScroll(0, 20); isScrolled = true; }
+												if (_isKeyPressed[Keyboard.LEFT] != undefined && _isKeyPressed[Keyboard.LEFT]) { _relativeScroll( -20, 0); isScrolled = true; _absoluteScrollQueue.length = 0; }
+												if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { _relativeScroll(20, 0); isScrolled = true; _absoluteScrollQueue.length = 0; }
 												
 												// scrollRect が変化していたら Event.SCROLL イベントを dispatch
 												if(isScrolled){ rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); }
@@ -270,7 +270,7 @@
 											if (_absoluteScrollQueue.length > 0) {
 												var absoluteScrollEntry2:Object = _absoluteScrollQueue.shift();
 												
-												absoluteScroll(absoluteScrollEntry2["scrollTo_x"], _rootSp_PRoll_ref.scrollRect.y);
+												_absoluteScroll(absoluteScrollEntry2["scrollTo_x"], _rootSp_PRoll_ref.scrollRect.y);
 												rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 											}
 										}
@@ -319,7 +319,7 @@
 							pianoroll.addEventListener(MouseEvent.MOUSE_WHEEL, function(e3:MouseEvent):void {
 								var delta:int = e3.delta; // ホイールの回転量
 
-								relativeScroll(0, PianoRoll.SEMITONE_HEIGHT * ( -delta )); // (半音の縦幅)*(ホイールの回転量)ずつスクロール（スクロールの向きは指を動かす方向と同じ）
+								_relativeScroll(0, PianoRoll.SEMITONE_HEIGHT * ( -delta )); // (半音の縦幅)*(ホイールの回転量)ずつスクロール（スクロールの向きは指を動かす方向と同じ）
 								rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 							});
 							// TODO: キー押下状態中にフォーカスがどっか行ったときに備えて FocusEvent.OUT 時にキー押下状態を全部 false にするコードを追加
@@ -602,7 +602,7 @@
 										pageSize="{pianoroll.height}"
 										lineScrollSize="20" pageScrollSize="{pianoroll.height}" 
 										repeatDelay="0" repeatInterval="0"
-										scroll="_absoluteScrollQueue.length = 0; _rootSp_PRoll_ref.scrollRect = new Rectangle(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition, pianoroll.width, pianoroll.height);" />
+										scroll="_absoluteScrollQueue.length = 0; _absoluteScroll(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);" />
 					</mx:GridItem>
 				</mx:GridRow>
 
@@ -615,7 +615,7 @@
 										pageSize="{pianoroll.width}"
 										lineScrollSize="20" pageScrollSize="{pianoroll.width}" 
 										repeatDelay="0" repeatInterval="0"
-										scroll="_absoluteScrollQueue.length = 0; _rootSp_PRoll_ref.scrollRect = new Rectangle(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y, pianoroll.width, pianoroll.height)" />
+										scroll="_absoluteScrollQueue.length = 0; _absoluteScroll(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y);" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
