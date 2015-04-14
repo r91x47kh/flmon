@@ -6,11 +6,11 @@ package net.vt6f3ohw.flmon {
 		
 		// 定数たち
 		/** 1拍あたりの幅 */
-		public static var BEAT_WIDTH:uint = 48;
+		public static var BEAT_WIDTH:Number = 48.0;
 		/** 1半音あたりの高さ */
-		public static var SEMITONE_HEIGHT:uint = 12;
+		public static var SEMITONE_HEIGHT:Number = 12.0;
 		/** ピアノロールの高さ */
-		public static var PIANOROLL_HEIGHT:uint = SEMITONE_HEIGHT*128; // TODO: MChannel@FlMMLエンジン の frequencyMap の要素数に応じてこの値が動的に変わるようにする
+		public static var PIANOROLL_HEIGHT:Number = SEMITONE_HEIGHT*128; // TODO: MChannel@FlMMLエンジン の frequencyMap の要素数に応じてこの値が動的に変わるようにする
 		
 		// 参照のプールたち
 		private var _shape2_ref:Shape;

@@ -31,6 +31,7 @@
 				import flash.display.Sprite;
 				import flash.text.TextField;
 				import flash.media.SoundChannel;
+				import net.vt6f3ohw.flmon.KeyBoardPanel;
 				import net.vt6f3ohw.flmon.PianoRoll;
 				import net.vt6f3ohw.flmon.PianoRollItem;
 				import net.vt6f3ohw.flmon.Util;
@@ -46,6 +47,10 @@
 				// 定数たち
 				
 				// Sprite製UI部品たち
+				
+				private var _rootSp_KBoard_ref:KeyBoardPanel; // root となる Sprite
+				private var _mask_KBoard_ref:Sprite; // マスク
+				
 				private var _rootSp_PRoll_ref:PianoRoll; // root となる Sprite
 					private var _frameCounterText_ref:TextField;
 					private var _soundChannelPositionText_ref:TextField;
@@ -135,7 +140,48 @@
 							;
 						}
 						{ // 鍵盤部分のUIの準備
-							;
+							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
+								var mask_KBoard:Sprite;
+								{ // mask_KBoard の初期化
+									mask_KBoard = new Sprite();
+									mask_KBoard.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
+									mask_KBoard.graphics.beginFill(0x000000);
+									mask_KBoard.graphics.drawRect(0, 0, kboard.width, kboard.height);
+									mask_KBoard.graphics.endFill();
+								}
+								_mask_KBoard_ref = mask_KBoard;
+								
+								kboard.addChild(mask_KBoard); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+								kboard.mask = mask_KBoard;
+							}
+							{ // mx:Image の中に Sprite ツリーを投入
+								var rootSp_KBoard:KeyBoardPanel; // mx:Image の中で root となる Sprite
+								{ // rootSp_KBoard の初期化
+									rootSp_KBoard = new KeyBoardPanel();
+									rootSp_KBoard.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, kboard.width, kboard.height); // デフォルトのスクロール位置とビューポートのサイズを設定
+								}
+								_rootSp_KBoard_ref = rootSp_KBoard;
+								
+								kboard.addChild(rootSp_KBoard);
+							}
+							kboard.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
+								{ // マスク矩形のサイズを更新
+									_mask_KBoard_ref.graphics.clear();
+									_mask_KBoard_ref.graphics.beginFill(0x000000);
+									_mask_KBoard_ref.graphics.drawRect(0, 0, kboard.width, kboard.height);
+									_mask_KBoard_ref.graphics.endFill();
+								}
+								{ // 鍵盤部分のビューポートのサイズを更新
+									var rect:Rectangle;
+									{
+										rect = _rootSp_KBoard_ref.scrollRect.clone();
+										rect.width = kboard.width;
+										rect.height = kboard.height;
+									}
+									
+									_rootSp_KBoard_ref.scrollRect = rect;
+								}
+							});
 						}
 						{ // ピアノロール部分のUIの準備
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
@@ -278,6 +324,15 @@
 									rootSp_PRoll.addEventListener(Event.SCROLL, function(e:Event):void { // rootSp_PRoll.scrollRect が変化したときに呼ばれるハンドラ
 										pianorollHScrollBar.scrollPosition = rootSp_PRoll.scrollRect.x;
 										pianorollVScrollBar.scrollPosition = rootSp_PRoll.scrollRect.y;
+										{ // 「鍵盤Spriteのy方向のクリッピング位置」を「ピアノロールSpriteのy方向のクリッピング位置」と同期
+											var rect:Rectangle;
+											{
+												rect = _rootSp_KBoard_ref.scrollRect.clone();
+												rect.y = _rootSp_PRoll_ref.scrollRect.y;
+											}
+											
+											_rootSp_KBoard_ref.scrollRect = rect;
+										}
 									});
 								}
 								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
@@ -508,7 +563,7 @@
 										//できたノート(= PianoRollItem)列をダンプ
 										//trace(pianoRollItemArr);
 										
-										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)));
+										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)), 0.6);
 										{
 											len = pianoRollItemArr.length;
 											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
@@ -572,7 +627,7 @@
 	      ]]>
 	</mx:Script>
 
-	<mx:Panel title="FlMMLMonitor" width="100%" height="100%"
+	<mx:Panel title="FlMMLMonitor Rev.1 (based on FlMML@CodePlex Commit 19253)" width="100%" height="100%"
 	          paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
 	    <mx:VBox width="100%" height="100%"
 	                   paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
@@ -583,7 +638,7 @@
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
 					<mx:GridItem height="48">
-						<!--小節数--><mx:Image></mx:Image>
+						<!--小節数--><mx:Image id="measureheader" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
@@ -591,7 +646,7 @@
 
 				<mx:GridRow width="100%" height="100%">
 					<mx:GridItem width="120">
-						<!--鍵盤--><mx:Image></mx:Image>
+						<!--鍵盤--><mx:Image id="kboard" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
 					<mx:GridItem width="100%" height="100%">
 						<!--ピアノロール--><flmon:FocusImage id="pianoroll" width="100%" height="100%"></flmon:FocusImage>
@@ -602,7 +657,16 @@
 										pageSize="{pianoroll.height}"
 										lineScrollSize="20" pageScrollSize="{pianoroll.height}" 
 										repeatDelay="0" repeatInterval="0"
-										scroll="_absoluteScrollQueue.length = 0; _absoluteScroll(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);" />
+										scroll="
+										_absoluteScrollQueue.length = 0;
+										_absoluteScroll(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);
+										var rect:Rectangle;
+										{
+											rect = _rootSp_KBoard_ref.scrollRect.clone();
+											rect.y = _rootSp_PRoll_ref.scrollRect.y;
+										}
+										_rootSp_KBoard_ref.scrollRect = rect;
+										" />
 					</mx:GridItem>
 				</mx:GridRow>
 
@@ -615,7 +679,10 @@
 										pageSize="{pianoroll.width}"
 										lineScrollSize="20" pageScrollSize="{pianoroll.width}" 
 										repeatDelay="0" repeatInterval="0"
-										scroll="_absoluteScrollQueue.length = 0; _absoluteScroll(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y);" />
+										scroll="
+										_absoluteScrollQueue.length = 0;
+										_absoluteScroll(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y);
+										" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
