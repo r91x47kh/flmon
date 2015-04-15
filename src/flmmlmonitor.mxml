@@ -34,6 +34,7 @@
 				import flash.media.SoundChannel;
 				import net.vt6f3ohw.flmon.ColorSet;
 				import net.vt6f3ohw.flmon.KeyBoardPanel;
+				import net.vt6f3ohw.flmon.MaskShape;
 				import net.vt6f3ohw.flmon.PianoRoll;
 				import net.vt6f3ohw.flmon.PianoRollItem;
 				import net.vt6f3ohw.flmon.Util;
@@ -50,13 +51,11 @@
 				
 				// Sprite製UI部品たち
 				
-				private var _rootSp_KBoard_ref:KeyBoardPanel; // root となる Sprite
-				private var _mask_KBoard_ref:Sprite; // マスク
+				private var _kboardSprite_ref:KeyBoardPanel; // root となる Sprite
 				
-				private var _rootSp_PRoll_ref:PianoRoll; // root となる Sprite
+				private var _pianorollSprite_ref:PianoRoll; // root となる Sprite
 					private var _frameCounterText_ref:TextField;
 					private var _soundChannelPositionText_ref:TextField;
-				private var _mask_PRoll_ref:Sprite; // マスク
 				
 				// UI操作用変数たち
 				/** 現在のフレームの_positionXInPixel */
@@ -69,7 +68,7 @@
 				private var _absoluteScroll:Function = function(x:int, y:int):void {
 					var rect:Rectangle;
 					{
-						rect = _rootSp_PRoll_ref.scrollRect.clone();
+						rect = _pianorollSprite_ref.scrollRect.clone();
 						rect.x = x;
 						rect.y = y;
 						if (rect.x < 0) rect.x = 0; // 画面左端以降にスクロールしようとしていたらクリッピング
@@ -78,16 +77,16 @@
 						if (rect.y + rect.height > PianoRoll.PIANOROLL_HEIGHT) rect.y = PianoRoll.PIANOROLL_HEIGHT - rect.height; // 画面下端以降にスクロールしようとしていたらクリッピング
 					}
 					
-					_rootSp_PRoll_ref.scrollRect = rect;
+					_pianorollSprite_ref.scrollRect = rect;
 				};
 				/** [ユーティリティ関数] ピアノロールを (deltaX, deltaY) だけスクロールする*/
 				private var _relativeScroll:Function = function(deltaX:int, deltaY:int):void {
-					_absoluteScroll(_rootSp_PRoll_ref.scrollRect.x + deltaX, _rootSp_PRoll_ref.scrollRect.y + deltaY);
+					_absoluteScroll(_pianorollSprite_ref.scrollRect.x + deltaX, _pianorollSprite_ref.scrollRect.y + deltaY);
 				};
 							
 				
 				// カウンタたち
-				private var frameCounter:uint = 0;
+				private var _frameCounter:uint = 0;
 				
 				// 再生情報取得用変数たち
 				/** MSequencerインスタンスへの参照 */
@@ -143,69 +142,41 @@
 						}
 						{ // 鍵盤部分のUIの準備
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-								var mask_KBoard:Sprite;
-								{ // mask_KBoard の初期化
-									mask_KBoard = new Sprite();
-									mask_KBoard.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
-									mask_KBoard.graphics.beginFill(0x000000);
-									mask_KBoard.graphics.drawRect(0, 0, kboard.width, kboard.height);
-									mask_KBoard.graphics.endFill();
-								}
-								_mask_KBoard_ref = mask_KBoard;
-								
-								kboard.addChild(mask_KBoard); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
-								kboard.mask = mask_KBoard;
+								kboardUIComponent.addChild(kboardUIComponent.mask = new MaskShape(kboardUIComponent)); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
 							}
 							{ // mx:Image の中に Sprite ツリーを投入
-								var rootSp_KBoard:KeyBoardPanel; // mx:Image の中で root となる Sprite
-								{ // rootSp_KBoard の初期化
-									rootSp_KBoard = new KeyBoardPanel();
-									rootSp_KBoard.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, kboard.width, kboard.height); // デフォルトのスクロール位置とビューポートのサイズを設定
+								var kboardSprite:KeyBoardPanel; // mx:Image の中で root となる Sprite
+								{ // kboardSprite の初期化
+									kboardSprite = new KeyBoardPanel();
+									kboardSprite.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, kboardUIComponent.width, kboardUIComponent.height); // デフォルトのスクロール位置とビューポートのサイズを設定
 								}
-								_rootSp_KBoard_ref = rootSp_KBoard;
+								_kboardSprite_ref = kboardSprite;
 								
-								kboard.addChild(rootSp_KBoard);
+								kboardUIComponent.addChild(kboardSprite);
 							}
-							kboard.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
-								{ // マスク矩形のサイズを更新
-									_mask_KBoard_ref.graphics.clear();
-									_mask_KBoard_ref.graphics.beginFill(0x000000);
-									_mask_KBoard_ref.graphics.drawRect(0, 0, kboard.width, kboard.height);
-									_mask_KBoard_ref.graphics.endFill();
-								}
+							kboardUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
 								{ // 鍵盤部分のビューポートのサイズを更新
 									var rect:Rectangle;
 									{
-										rect = _rootSp_KBoard_ref.scrollRect.clone();
-										rect.width = kboard.width;
-										rect.height = kboard.height;
+										rect = _kboardSprite_ref.scrollRect.clone();
+										rect.width = kboardUIComponent.width;
+										rect.height = kboardUIComponent.height;
 									}
 									
-									_rootSp_KBoard_ref.scrollRect = rect;
+									_kboardSprite_ref.scrollRect = rect;
 								}
 							});
 						}
 						{ // ピアノロール部分のUIの準備
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-								var mask_PRoll:Sprite;
-								{ // mask_PRoll の初期化
-									mask_PRoll = new Sprite();
-									mask_PRoll.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
-									mask_PRoll.graphics.beginFill(0x000000);
-									mask_PRoll.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-									mask_PRoll.graphics.endFill();
-								}
-								_mask_PRoll_ref = mask_PRoll;
-								
-								pianoroll.addChild(mask_PRoll); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
-								pianoroll.mask = mask_PRoll;
+								pianorollUIComponent.addChild(pianorollUIComponent.mask = new MaskShape(pianorollUIComponent)); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
 							}
 							{ // mx:Image の中に Sprite ツリーを投入
-								var rootSp_PRoll:PianoRoll; // mx:Image の中で root となる Sprite
-								{ // rootSp_PRoll の初期化
-									rootSp_PRoll = new PianoRoll();
-									rootSp_PRoll.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, pianoroll.width, pianoroll.height); // デフォルトのスクロール位置とビューポートのサイズを設定
-									{ // rootSp_PRoll に子Sprite （フレームカウントを表示するTextField）を追加
+								var pianorollSprite:PianoRoll; // mx:Image の中で root となる Sprite
+								{ // pianorollSprite の初期化
+									pianorollSprite = new PianoRoll();
+									pianorollSprite.scrollRect = new Rectangle(0, PianoRoll.SEMITONE_HEIGHT*36, pianorollUIComponent.width, pianorollUIComponent.height); // デフォルトのスクロール位置とビューポートのサイズを設定
+									{ // pianorollSprite に子Sprite （フレームカウントを表示するTextField）を追加
 										var frameCounterText:TextField;
 										{
 											frameCounterText = new TextField();
@@ -220,9 +191,9 @@
 										}
 										_frameCounterText_ref = frameCounterText; // 参照のプール
 										
-										rootSp_PRoll.addChild(frameCounterText);
+										pianorollSprite.addChild(frameCounterText);
 									}
-									{ // rootSp_PRoll に子Sprite （再生位置を表示するTextField）を追加
+									{ // pianorollSprite に子Sprite （再生位置を表示するTextField）を追加
 										var soundChannelPositionText:TextField;
 										{
 											soundChannelPositionText = new TextField();
@@ -237,11 +208,11 @@
 										}
 										_soundChannelPositionText_ref = soundChannelPositionText; // 参照のプール
 										
-										rootSp_PRoll.addChild(soundChannelPositionText);
+										pianorollSprite.addChild(soundChannelPositionText);
 									}
-									rootSp_PRoll.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
+									pianorollSprite.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
 										{ // フレームカウント文字列を更新
-											_frameCounterText_ref.text = "frame count: " + (++frameCounter).toString();
+											_frameCounterText_ref.text = "frame count: " + (++_frameCounter).toString();
 										}
 										{ // 再生位置文字列を更新
 											if (_sequencer_ref != null) {
@@ -263,11 +234,11 @@
 												if (_isKeyPressed[Keyboard.RIGHT] != undefined && _isKeyPressed[Keyboard.RIGHT]) { _relativeScroll(20, 0); isScrolled = true; _absoluteScrollQueue.length = 0; }
 												
 												// scrollRect が変化していたら Event.SCROLL イベントを dispatch
-												if(isScrolled){ rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); }
+												if(isScrolled){ pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); }
 											}
 										}
 										{ // 再生位置バーを更新＋再生位置バーに応じてオートスクロールをキュー
-											rootSp_PRoll.playingPositionBarLayer_ref.graphics.clear();
+											pianorollSprite.playingPositionBarLayer_ref.graphics.clear();
 											if (_sequencer_ref != null) { // 一応nullチェック
 												var soundChannel:SoundChannel = _sequencer_ref.getSoundChannel();
 												
@@ -281,9 +252,9 @@
 																_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(_sequencer_ref.getSoundChannel().position) / 96.0);
 															}
 															
-															rootSp_PRoll.playingPositionBarLayer_ref.graphics.lineStyle(4, 0x333333, 0.5);
-															rootSp_PRoll.playingPositionBarLayer_ref.graphics.moveTo(_positionXInPixel, 0);
-															rootSp_PRoll.playingPositionBarLayer_ref.graphics.lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
+															pianorollSprite.playingPositionBarLayer_ref.graphics.lineStyle(4, 0x333333, 0.5);
+															pianorollSprite.playingPositionBarLayer_ref.graphics.moveTo(_positionXInPixel, 0);
+															pianorollSprite.playingPositionBarLayer_ref.graphics.lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
 															
 															{ // 一定の条件が満たされたときにオートスクロールをキューする
 																// オートスクロールが有効で、かつオートスクロール中でないときのみ新たにオートスクロールする
@@ -292,8 +263,8 @@
 																	
 																	trace("_positionXInPixel_prev = " + _positionXInPixel_prev + ", _positionXInPixel = " + _positionXInPixel);
 																	// 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点をまたいだらオートスクロール
-																	if (_positionXInPixel_prev < rootSp_PRoll.scrollRect.x + rootSp_PRoll.width - ACTIVATION_WIDTH
-																		&& rootSp_PRoll.scrollRect.x + rootSp_PRoll.width - ACTIVATION_WIDTH <= _positionXInPixel) { // 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点にピッタリ到達してしまう場合に対処して「<」ではなく「<=」にしておく
+																	if (_positionXInPixel_prev < pianorollSprite.scrollRect.x + pianorollSprite.width - ACTIVATION_WIDTH
+																		&& pianorollSprite.scrollRect.x + pianorollSprite.width - ACTIVATION_WIDTH <= _positionXInPixel) { // 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点にピッタリ到達してしまう場合に対処して「<」ではなく「<=」にしておく
 																		//trace("stepped over");
 																		
 																		var DURATION_IN_FRAME:Number = 60.0; // 何フレームで動かすか
@@ -301,7 +272,7 @@
 																			var absoluteScrollEntry:Object; // スクロール先の絶対座標を保持するエントリ
 																			{
 																				absoluteScrollEntry = new Object(); // absoluteScrollEntry["scrollTo_x"] のみを要素に持つ連想配列
-																				absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, rootSp_PRoll.scrollRect.x, rootSp_PRoll.width - ACTIVATION_WIDTH, DURATION_IN_FRAME);
+																				absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, pianorollSprite.scrollRect.x, pianorollSprite.width - ACTIVATION_WIDTH, DURATION_IN_FRAME);
 																			}
 																			
 																			_absoluteScrollQueue.push(absoluteScrollEntry);
@@ -318,77 +289,71 @@
 											if (_absoluteScrollQueue.length > 0) {
 												var absoluteScrollEntry2:Object = _absoluteScrollQueue.shift();
 												
-												_absoluteScroll(absoluteScrollEntry2["scrollTo_x"], _rootSp_PRoll_ref.scrollRect.y);
-												rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
+												_absoluteScroll(absoluteScrollEntry2["scrollTo_x"], _pianorollSprite_ref.scrollRect.y);
+												pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 											}
 										}
 									});
-									rootSp_PRoll.addEventListener(Event.SCROLL, function(e:Event):void { // rootSp_PRoll.scrollRect が変化したときに呼ばれるハンドラ
-										pianorollHScrollBar.scrollPosition = rootSp_PRoll.scrollRect.x;
-										pianorollVScrollBar.scrollPosition = rootSp_PRoll.scrollRect.y;
+									pianorollSprite.addEventListener(Event.SCROLL, function(e:Event):void { // pianorollSprite.scrollRect が変化したときに呼ばれるハンドラ
+										pianorollHScrollBar.scrollPosition = pianorollSprite.scrollRect.x;
+										pianorollVScrollBar.scrollPosition = pianorollSprite.scrollRect.y;
 										{ // 「鍵盤Spriteのy方向のクリッピング位置」を「ピアノロールSpriteのy方向のクリッピング位置」と同期
 											var rect:Rectangle;
 											{
-												rect = _rootSp_KBoard_ref.scrollRect.clone();
-												rect.y = _rootSp_PRoll_ref.scrollRect.y;
+												rect = _kboardSprite_ref.scrollRect.clone();
+												rect.y = _pianorollSprite_ref.scrollRect.y;
 											}
 											
-											_rootSp_KBoard_ref.scrollRect = rect;
+											_kboardSprite_ref.scrollRect = rect;
 										}
 									});
 								}
-								_rootSp_PRoll_ref = rootSp_PRoll; // 参照のプール
+								_pianorollSprite_ref = pianorollSprite; // 参照のプール
 								
-								pianoroll.addChild(rootSp_PRoll);
+								pianorollUIComponent.addChild(pianorollSprite);
 							}
-							pianoroll.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
-								{ // マスク矩形のサイズを更新
-									_mask_PRoll_ref.graphics.clear();
-									_mask_PRoll_ref.graphics.beginFill(0x000000);
-									_mask_PRoll_ref.graphics.drawRect(0, 0, pianoroll.width, pianoroll.height);
-									_mask_PRoll_ref.graphics.endFill();
-								}
+							pianorollUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
 								{ // ピアノロールのビューポートのサイズを更新
 									var rect:Rectangle;
 									{
-										rect = _rootSp_PRoll_ref.scrollRect.clone();
-										rect.width = pianoroll.width;
-										rect.height = pianoroll.height;
+										rect = _pianorollSprite_ref.scrollRect.clone();
+										rect.width = pianorollUIComponent.width;
+										rect.height = pianorollUIComponent.height;
 									}
 									
-									_rootSp_PRoll_ref.scrollRect = rect;
+									_pianorollSprite_ref.scrollRect = rect;
 								}
 								{ // 縦横スクロールバーの pageSize を更新（不要？）
-									pianorollHScrollBar.pageSize = pianoroll.width;
-									pianorollVScrollBar.pageSize = pianoroll.height;
+									pianorollHScrollBar.pageSize = pianorollUIComponent.width;
+									pianorollVScrollBar.pageSize = pianorollUIComponent.height;
 								}
 								{ // 縦横スクロールバーの maxScrollPosition を更新
-									pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianoroll.width;
-									pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianoroll.height;
+									pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianorollUIComponent.width;
+									pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianorollUIComponent.height;
 								}
 							});
-							pianoroll.addEventListener(KeyboardEvent.KEY_DOWN, function(e2:KeyboardEvent):void {
+							pianorollUIComponent.addEventListener(KeyboardEvent.KEY_DOWN, function(e2:KeyboardEvent):void {
 								_isKeyPressed[e2.keyCode] = true;
 							});
-							pianoroll.addEventListener(KeyboardEvent.KEY_UP, function(e2:KeyboardEvent):void {
+							pianorollUIComponent.addEventListener(KeyboardEvent.KEY_UP, function(e2:KeyboardEvent):void {
 								_isKeyPressed[e2.keyCode] = false;
 							});
-							pianoroll.addEventListener(MouseEvent.MOUSE_WHEEL, function(e3:MouseEvent):void {
+							pianorollUIComponent.addEventListener(MouseEvent.MOUSE_WHEEL, function(e3:MouseEvent):void {
 								var delta:int = e3.delta; // ホイールの回転量
 
 								_relativeScroll(0, PianoRoll.SEMITONE_HEIGHT * ( -delta )); // (半音の縦幅)*(ホイールの回転量)ずつスクロール（スクロールの向きは指を動かす方向と同じ）
-								rootSp_PRoll.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
+								pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 							});
 							// TODO: キー押下状態中にフォーカスがどっか行ったときに備えて FocusEvent.OUT 時にキー押下状態を全部 false にするコードを追加
-							// pianoroll.addEventListener(FocusEvent.FOCUS_OUT, function(e3:FocusEvent):void {
+							// pianorollUIComponent.addEventListener(FocusEvent.FOCUS_OUT, function(e3:FocusEvent):void {
 							// 	trace(e3);
 							// });
 						}
 						{ // 縦横スクロールバーの scrollPosition, maxScrollPosition を初期化
-							pianorollHScrollBar.scrollPosition = rootSp_PRoll.scrollRect.x;
-							pianorollVScrollBar.scrollPosition = rootSp_PRoll.scrollRect.y;
-							pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianoroll.width;
-							pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianoroll.height;
+							pianorollHScrollBar.scrollPosition = pianorollSprite.scrollRect.x;
+							pianorollVScrollBar.scrollPosition = pianorollSprite.scrollRect.y;
+							pianorollHScrollBar.maxScrollPosition = (PianoRoll.BEAT_WIDTH*4)*100 - pianorollUIComponent.width;
+							pianorollVScrollBar.maxScrollPosition = PianoRoll.PIANOROLL_HEIGHT - pianorollUIComponent.height;
 						}
 					}
 				}
@@ -418,7 +383,7 @@
 										var absoluteScrollEntry:Object; // スクロール先の絶対座標を保持するエントリ
 										{
 											absoluteScrollEntry = new Object(); // absoluteScrollEntry["scrollTo_x"] のみを要素に持つ連想配列
-											absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, _rootSp_PRoll_ref.scrollRect.x, -_rootSp_PRoll_ref.scrollRect.x, DURATION_IN_FRAME);
+											absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, _pianorollSprite_ref.scrollRect.x, -_pianorollSprite_ref.scrollRect.x, DURATION_IN_FRAME);
 										}
 										
 										_absoluteScrollQueue.push(absoluteScrollEntry);
@@ -530,7 +495,7 @@
 						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
 							var colorSet:ColorSet = new ColorSet(); // 
 							
-							_rootSp_PRoll_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
+							_pianorollSprite_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
 							{
 								len2 = tracks.length;
 								for (j = 0 ; j < len2 ; j++ ) {
@@ -570,18 +535,18 @@
 										colorSet.h = (240/*←青スタート*/ -/*←「青→水色→黄緑→黄→橙→赤→紫」の順に辿るためマイナスを指定*/ (30*j)/*←色相を12ステップで1周*/) % 360; // 色相（hue）
 										colorSet.s = 100; // 彩度（Saturation）
 										colorSet.v = 80; // 明度（Value）
-										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
+										_pianorollSprite_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
 										{
 											len = pianoRollItemArr.length;
 											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
 												var item2:PianoRollItem = pianoRollItemArr[i];
 												
 												{ // ノートを配置
-													_rootSp_PRoll_ref.itemLayer_ref.graphics.moveTo(
+													_pianorollSprite_ref.itemLayer_ref.graphics.moveTo(
 														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
 														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
 													);
-													_rootSp_PRoll_ref.itemLayer_ref.graphics.lineTo(
+													_pianorollSprite_ref.itemLayer_ref.graphics.lineTo(
 														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
 														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
 													);
@@ -653,26 +618,26 @@
 
 				<mx:GridRow width="100%" height="100%">
 					<mx:GridItem width="120">
-						<!--鍵盤--><mx:Image id="kboard" width="100%" height="100%"></mx:Image>
+						<!--鍵盤--><mx:Image id="kboardUIComponent" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
 					<mx:GridItem width="100%" height="100%">
-						<!--ピアノロール--><flmon:FocusImage id="pianoroll" width="100%" height="100%"></flmon:FocusImage>
+						<!--ピアノロール--><flmon:FocusImage id="pianorollUIComponent" width="100%" height="100%"></flmon:FocusImage>
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#ffffff">
 						<!--縦スクロールバー--><mx:VScrollBar id="pianorollVScrollBar" height="100%"
 										minScrollPosition="0" maxScrollPosition="0" scrollPosition="0"
-										pageSize="{pianoroll.height}"
-										lineScrollSize="20" pageScrollSize="{pianoroll.height}" 
+										pageSize="{pianorollUIComponent.height}"
+										lineScrollSize="20" pageScrollSize="{pianorollUIComponent.height}" 
 										repeatDelay="0" repeatInterval="0"
 										scroll="
 										_absoluteScrollQueue.length = 0;
-										_absoluteScroll(_rootSp_PRoll_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);
+										_absoluteScroll(_pianorollSprite_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);
 										var rect:Rectangle;
 										{
-											rect = _rootSp_KBoard_ref.scrollRect.clone();
-											rect.y = _rootSp_PRoll_ref.scrollRect.y;
+											rect = _kboardSprite_ref.scrollRect.clone();
+											rect.y = _pianorollSprite_ref.scrollRect.y;
 										}
-										_rootSp_KBoard_ref.scrollRect = rect;
+										_kboardSprite_ref.scrollRect = rect;
 										" />
 					</mx:GridItem>
 				</mx:GridRow>
@@ -683,12 +648,12 @@
 					<mx:GridItem backgroundColor="#ffffff">
 						<!--横スクロールバー--><mx:HScrollBar id="pianorollHScrollBar" width="100%"
 										minScrollPosition="0" maxScrollPosition="0" scrollPosition="0"
-										pageSize="{pianoroll.width}"
-										lineScrollSize="20" pageScrollSize="{pianoroll.width}" 
+										pageSize="{pianorollUIComponent.width}"
+										lineScrollSize="20" pageScrollSize="{pianorollUIComponent.width}" 
 										repeatDelay="0" repeatInterval="0"
 										scroll="
 										_absoluteScrollQueue.length = 0;
-										_absoluteScroll(pianorollHScrollBar.scrollPosition, _rootSp_PRoll_ref.scrollRect.y);
+										_absoluteScroll(pianorollHScrollBar.scrollPosition, _pianorollSprite_ref.scrollRect.y);
 										" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
