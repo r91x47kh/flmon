@@ -180,10 +180,7 @@
 										var frameCounterText:TextField;
 										{
 											frameCounterText = new TextField();
-											frameCounterText.x = 20;
-											frameCounterText.y = 20;
-											frameCounterText.width = 400;
-											frameCounterText.height = 60;
+											with (frameCounterText = new TextField()) { x = 20; y = 20; width = 400; height = 60; }
 											
 											// デバッグ時は true にする
 											//frameCounterText.visible = true;
@@ -196,11 +193,7 @@
 									{ // pianorollSprite に子Sprite （再生位置を表示するTextField）を追加
 										var soundChannelPositionText:TextField;
 										{
-											soundChannelPositionText = new TextField();
-											soundChannelPositionText.x = 20;
-											soundChannelPositionText.y = 60;
-											soundChannelPositionText.width = 400;
-											soundChannelPositionText.height = 60;
+											with (soundChannelPositionText = new TextField()) { x = 20; y = 60; width = 400; height = 60; }
 											
 											// デバッグ時は true にする
 											//soundChannelPositionText.visible = true;
@@ -252,9 +245,11 @@
 																_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(_sequencer_ref.getSoundChannel().position) / 96.0);
 															}
 															
-															pianorollSprite.playingPositionBarLayer_ref.graphics.lineStyle(4, 0x333333, 0.5);
-															pianorollSprite.playingPositionBarLayer_ref.graphics.moveTo(_positionXInPixel, 0);
-															pianorollSprite.playingPositionBarLayer_ref.graphics.lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
+															with (pianorollSprite.playingPositionBarLayer_ref.graphics) {
+																lineStyle(4, 0x333333, 0.5);
+																moveTo(_positionXInPixel, 0);
+																lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
+															}
 															
 															{ // 一定の条件が満たされたときにオートスクロールをキューする
 																// オートスクロールが有効で、かつオートスクロール中でないときのみ新たにオートスクロールする
@@ -518,9 +513,11 @@
 															item.velocity = e.getVelocity();
 															break;
 														case MStatus.NOTE_OFF:
+															// TODO: 38401 tick目以降にあるNOTE_OFFでも、対応するNOTE_ONが38400 tick目以前にある場合は特別に処理する
 															item.endPosInTick = e.getTick();
 															pianoRollItemArr.push(item);
 															break;
+														case MStatus.NOTE: // TODO: タイに対応
 														case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
 														default:
 															break;
@@ -541,12 +538,12 @@
 											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
 												var item2:PianoRollItem = pianoRollItemArr[i];
 												
-												{ // ノートを配置
-													_pianorollSprite_ref.itemLayer_ref.graphics.moveTo(
+												with(_pianorollSprite_ref.itemLayer_ref.graphics){ // ノートレイヤにノートを配置
+													moveTo(
 														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
 														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
 													);
-													_pianorollSprite_ref.itemLayer_ref.graphics.lineTo(
+													lineTo(
 														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
 														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
 													);
