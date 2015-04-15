@@ -22,6 +22,7 @@
 				import com.txt_nifty.sketch.flmml.MML;
 				import com.txt_nifty.sketch.flmml.MMLEvent;
 				import com.txt_nifty.sketch.flmml.MSequencer;
+				import flash.display.DisplayObject;
 				import flash.events.Event;
 				import flash.events.KeyboardEvent;
 				import flash.events.FocusEvent;
@@ -64,7 +65,21 @@
 				private var _positionXInPixel_prev:Number; 
 				/** オートスクロールの際の毎フレームでのスクロール量を格納するキュー */
 				private var _absoluteScrollQueue:Array = new Array();
-				/** [ユーティリティ関数] ピアノロールを (x, y) にスクロールする*/
+				
+				/** [ユーティリティ関数] DisplayObject インスタンスの scrollRect を書き換える。x, y, width, height にnullを指定した場合は以前の値を維持する。 */
+				private var _updateScrollRect:Function = function(obj:DisplayObject, x:Object, y:Object, width:Object, height:Object):void {
+					var rect:Rectangle;
+					{
+						rect = obj.scrollRect.clone();
+						if(x != null){ rect.x = Number(x); }
+						if(y != null){ rect.y = Number(y); }
+						if(width != null){ rect.width = Number(width); }
+						if(height != null){ rect.height = Number(height); }
+					}
+					
+					obj.scrollRect = rect;
+				};
+				/** [ユーティリティ関数] ピアノロールを (x, y) にスクロールする（クリッピング処理が必要なので _updateScrollRect は使っていない）*/
 				private var _absoluteScroll:Function = function(x:Number, y:Number):void {
 					var rect:Rectangle;
 					{
@@ -154,16 +169,9 @@
 								
 								kboardUIComponent.addChild(kboardSprite);
 							}
-							kboardUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
+							kboardUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // 鍵盤部分のサイズが変わった場合に備えてイベントハンドラを設定
 								{ // 鍵盤部分のビューポートのサイズを更新
-									var rect:Rectangle;
-									{
-										rect = _kboardSprite_ref.scrollRect.clone();
-										rect.width = kboardUIComponent.width;
-										rect.height = kboardUIComponent.height;
-									}
-									
-									_kboardSprite_ref.scrollRect = rect;
+									_updateScrollRect(_kboardSprite_ref, null, null, kboardUIComponent.width, kboardUIComponent.height);
 								}
 							});
 						}
@@ -309,14 +317,7 @@
 							}
 							pianorollUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // ピアノロールのサイズが変わった場合に備えてイベントハンドラを設定
 								{ // ピアノロールのビューポートのサイズを更新
-									var rect:Rectangle;
-									{
-										rect = _pianorollSprite_ref.scrollRect.clone();
-										rect.width = pianorollUIComponent.width;
-										rect.height = pianorollUIComponent.height;
-									}
-									
-									_pianorollSprite_ref.scrollRect = rect;
+									_updateScrollRect(_pianorollSprite_ref, null, null, pianorollUIComponent.width, pianorollUIComponent.height);
 								}
 								{ // 縦横スクロールバーの pageSize を更新（不要？）
 									pianorollHScrollBar.pageSize = pianorollUIComponent.width;
