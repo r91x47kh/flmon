@@ -301,13 +301,7 @@
 										pianorollHScrollBar.scrollPosition = pianorollSprite.scrollRect.x;
 										pianorollVScrollBar.scrollPosition = pianorollSprite.scrollRect.y;
 										{ // 「鍵盤Spriteのy方向のクリッピング位置」を「ピアノロールSpriteのy方向のクリッピング位置」と同期
-											var rect:Rectangle;
-											{
-												rect = _kboardSprite_ref.scrollRect.clone();
-												rect.y = _pianorollSprite_ref.scrollRect.y;
-											}
-											
-											_kboardSprite_ref.scrollRect = rect;
+											_updateScrollRect(_kboardSprite_ref, null, _pianorollSprite_ref.scrollRect.y, null, null);
 										}
 									});
 								}
@@ -630,12 +624,7 @@
 										scroll="
 										_absoluteScrollQueue.length = 0;
 										_absoluteScroll(_pianorollSprite_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);
-										var rect:Rectangle;
-										{
-											rect = _kboardSprite_ref.scrollRect.clone();
-											rect.y = _pianorollSprite_ref.scrollRect.y;
-										}
-										_kboardSprite_ref.scrollRect = rect;
+										_updateScrollRect(_kboardSprite_ref, null, _pianorollSprite_ref.scrollRect.y, null, null);
 										" />
 					</mx:GridItem>
 				</mx:GridRow>
