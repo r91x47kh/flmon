@@ -494,7 +494,7 @@
 							_pianorollSprite_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
 							{
 								len2 = tracks.length;
-								for (j = 0 ; j < len2 ; j++ ) {
+								for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
 									eventsOfTrack = tracks[j].getEvents();
 									
 									{
@@ -530,9 +530,9 @@
 										//できたノート(= PianoRollItem)列をダンプ
 										//trace(pianoRollItemArr);
 										
-										colorSet.h = (240/*←青スタート*/ -/*←「青→水色→黄緑→黄→橙→赤→紫」の順に辿るためマイナスを指定*/ (30*j)/*←色相を12ステップで1周*/) % 360; // 色相（hue）
-										colorSet.s = 100; // 彩度（Saturation）
-										colorSet.v = 80; // 明度（Value）
+										colorSet.h = ((240-(-30))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-30)/*←12ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
+										colorSet.s = 100; // 彩度（saturation）
+										colorSet.v = 80; // 明度（value）
 										_pianorollSprite_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
 										{
 											len = pianoRollItemArr.length;
