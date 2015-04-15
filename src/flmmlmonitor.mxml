@@ -65,7 +65,7 @@
 				/** オートスクロールの際の毎フレームでのスクロール量を格納するキュー */
 				private var _absoluteScrollQueue:Array = new Array();
 				/** [ユーティリティ関数] ピアノロールを (x, y) にスクロールする*/
-				private var _absoluteScroll:Function = function(x:int, y:int):void {
+				private var _absoluteScroll:Function = function(x:Number, y:Number):void {
 					var rect:Rectangle;
 					{
 						rect = _pianorollSprite_ref.scrollRect.clone();
@@ -80,7 +80,7 @@
 					_pianorollSprite_ref.scrollRect = rect;
 				};
 				/** [ユーティリティ関数] ピアノロールを (deltaX, deltaY) だけスクロールする*/
-				private var _relativeScroll:Function = function(deltaX:int, deltaY:int):void {
+				private var _relativeScroll:Function = function(deltaX:Number, deltaY:Number):void {
 					_absoluteScroll(_pianorollSprite_ref.scrollRect.x + deltaX, _pianorollSprite_ref.scrollRect.y + deltaY);
 				};
 							
@@ -95,8 +95,8 @@
 				private var _tempoEntries_ref:Array;
 				/** 再生位置[ms]に対応する再生位置[tick]を返す。*/
 				private var _msToTick:Function = function(ms:Number):Number {
-					var i:uint; // for用
-					var len:uint; // for
+					var i:int; // for用
+					var len:int; // for
 					
 					if (ms <= 0.0) return 0.0; // 変な入力に対処
 					
