@@ -5,6 +5,7 @@
                 xmlns:flmon="net.vt6f3ohw.flmon.*"
                 layout="absolute"
 				frameRate="60"
+				horizontalScrollPolicy="off" verticalScrollPolicy="off"
 				creationComplete="init();">
     <mx:Style>
         @namespace mx "http://www.adobe.com/2006/mxml";
@@ -31,6 +32,7 @@
 				import flash.display.Sprite;
 				import flash.text.TextField;
 				import flash.media.SoundChannel;
+				import net.vt6f3ohw.flmon.ColorSet;
 				import net.vt6f3ohw.flmon.KeyBoardPanel;
 				import net.vt6f3ohw.flmon.PianoRoll;
 				import net.vt6f3ohw.flmon.PianoRollItem;
@@ -284,8 +286,8 @@
 															rootSp_PRoll.playingPositionBarLayer_ref.graphics.lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
 															
 															{ // 一定の条件が満たされたときにオートスクロールをキューする
-																// オートスクロール中でないときのみ新たにオートスクロールする
-																if (_absoluteScrollQueue.length == 0) {
+																// オートスクロールが有効で、かつオートスクロール中でないときのみ新たにオートスクロールする
+																if (autoScrollCheckBox.selected && _absoluteScrollQueue.length == 0) {
 																	var ACTIVATION_WIDTH:Number = PianoRoll.BEAT_WIDTH * 4; // 画面右端から何pixelの所をまたいだらオートスクロールするか
 																	
 																	trace("_positionXInPixel_prev = " + _positionXInPixel_prev + ", _positionXInPixel = " + _positionXInPixel);
@@ -408,7 +410,7 @@
 						if (player.isPaused()) {
 							m_timer.start(); // 1秒ごとに再生位置表示を更新するタイマーを起動
 						}else {
-							{ // 新規再生が起きたら強制的にオートスクロールをキューする
+							if(rewindOnPlayCheckBox.selected){ // 「新規再生時に最初まで巻き戻し」が有効なときに新規再生が起きたらオートスクロールをキューする
 								_absoluteScrollQueue.length　= 0; // オートスクロール中だったらそのオートスクロールを中断する
 								{
 									var DURATION_IN_FRAME:Number = 60.0; // 何フレームで動かすか
@@ -526,6 +528,8 @@
 							// tempoBoundaryEntries はここでは使わない。_tempoEntries_ref　に入れたらここでは用済み
 						}
 						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
+							var colorSet:ColorSet = new ColorSet(); // 
+							
 							_rootSp_PRoll_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
 							{
 								len2 = tracks.length;
@@ -563,7 +567,10 @@
 										//できたノート(= PianoRollItem)列をダンプ
 										//trace(pianoRollItemArr);
 										
-										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, (64+Math.floor(Math.random()*192))*0x10000 + (64+Math.floor(Math.random()*192))*0x100 + (64+Math.floor(Math.random()*192)), 0.6);
+										colorSet.h = (240/*←青スタート*/ -/*←「青→水色→黄緑→黄→橙→赤→紫」の順に辿るためマイナスを指定*/ (30*j)/*←色相を12ステップで1周*/) % 360; // 色相（hue）
+										colorSet.s = 100; // 彩度（Saturation）
+										colorSet.v = 80; // 明度（Value）
+										_rootSp_PRoll_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
 										{
 											len = pianoRollItemArr.length;
 											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
@@ -622,7 +629,7 @@
 
 	          public function onSecond(e:Event):void {
 	            progress.text = player.getNowTimeStr() + " / " + player.getTotalTimeStr();
-				  //voiceCount.text = "♪" + player.getVoiceCount();
+				//voiceCount.text = "♪" + player.getVoiceCount();
 	          }
 	      ]]>
 	</mx:Script>
@@ -632,8 +639,8 @@
 	    <mx:VBox width="100%" height="100%"
 	                   paddingTop="4" paddingBottom="4" paddingLeft="4" paddingRight="4">
 	      <mx:VDividedBox width="100%" height="100%" backgroundColor="#dddddd">
-	        <mx:TextArea id="input" width="100%" height="2%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
-			<mx:Grid width="100%" height="96%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
+	        <mx:TextArea id="input" width="100%" height="4%" fontSize="14" text="L8 O5CDEFGAB&lt;C"></mx:TextArea>
+			<mx:Grid width="100%" height="94%" horizontalGap="0" verticalGap="0" backgroundColor="#ffdddd">
 				<mx:GridRow width="100%">
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
@@ -699,8 +706,10 @@
 	                    dataTipPlacement="top" tickColor="black" snapInterval="1"
 	                    allowTrackClick="true" liveDragging="true"
 	                    change="player.setMasterVolume(hSlider.value);"/>
-	        <mx:Label id="progress" text="" />
-	        <mx:Label id="voiceCount" text="" />
+	        <mx:Label id="progress" width="120" text="" />
+	        <mx:Label id="voiceCount" width="60" text="" />
+			<mx:CheckBox id="rewindOnPlayCheckBox" label="新規再生時に最初まで巻き戻す" selected="true"></mx:CheckBox>
+			<mx:CheckBox id="autoScrollCheckBox" label="ページ単位でオートスクロール" selected="true"></mx:CheckBox>
 	      </mx:Box>
 	      <flmml:FlMML id="player" />
 	    </mx:VBox>
