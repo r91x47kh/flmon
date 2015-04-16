@@ -68,6 +68,10 @@
 				private var _positionXInPixel_prev:Number; 
 				/** オートスクロールの際の毎フレームでのスクロール量を格納するキュー */
 				private var _absoluteScrollQueue:Array = new Array();
+				/** 再生位置バーとノートの交点に表示するインジケータのy座標の配列。_indicatorYArr[0] には0トラック目のインジケータのy座標が入る。 */
+				private var _indicatorYArr:Array = null;
+				/** インジケータのイージングに使用するキュー。 */
+				private var _indicatorEasingQueueArr:Array = null;
 				
 				/** [ユーティリティ関数] DisplayObject インスタンスの scrollRect を書き換える。x, y, width, height にnullを指定した場合は以前の値を維持する。 */
 				private var _updateScrollRect:Function = function(obj:DisplayObject, x:Object, y:Object, width:Object, height:Object):void {
@@ -247,15 +251,6 @@
 										{ // フレームカウント文字列を更新
 											_frameCounterText_ref.text = "frame count: " + (++_frameCounter).toString();
 										}
-										{ // 再生位置文字列を更新
-											if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
-												//trace(Util.getInstanceID(_sequencer_ref.getSoundChannel()));
-												
-												// ここ、ちゃんと毎回 _sequencer_ref.getSoundChannel() しないと
-												// 「position がずっと変化しない SoundChannel インスタンス」に遭遇するので注意（原因不明）
-												_soundChannelPositionText_ref.text = "sound channel position: " + _sequencer_ref.getSoundChannel().position.toString();
-											}
-										}
 										{ // ピアノロールのスクロール位置を更新											
 											{
 												var isScrolled:Boolean = false; // scrollRect が変化したかどうかを格納するBoolean
@@ -270,54 +265,6 @@
 												if(isScrolled){ pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); }
 											}
 										}
-										{ // 再生位置バーを更新＋再生位置バーに応じてオートスクロールをキュー
-											pianorollSprite.playingPositionBarLayer_ref.graphics.clear();
-											if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
-												// 再生中かポーズ中のときのみ再生位置バーを表示
-												if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) {
-													if(soundChannel != null){ // 一応nullチェック
-														{
-															{
-																// TODO: 「1回目はpositionXInPixel_prev に未定義の値が入る」問題に一応対処
-																_positionXInPixel_prev = _positionXInPixel; // _positionXInPixel を更新する前に _positionXInPixel_prev にバックアップ
-																_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(soundChannel.position) / 96.0);
-															}
-															
-															with (pianorollSprite.playingPositionBarLayer_ref.graphics) {
-																lineStyle(4, 0x333333, 0.5);
-																moveTo(_positionXInPixel, 0);
-																lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
-															}
-															
-															{ // 一定の条件が満たされたときにオートスクロールをキューする
-																// オートスクロールが有効で、かつオートスクロール中でないときのみ新たにオートスクロールする
-																if (autoScrollCheckBox.selected && _absoluteScrollQueue.length == 0) {
-																	var ACTIVATION_WIDTH:Number = PianoRoll.BEAT_WIDTH * 4; // 画面右端から何pixelの所をまたいだらオートスクロールするか
-																	
-																	//trace("_positionXInPixel_prev = " + _positionXInPixel_prev + ", _positionXInPixel = " + _positionXInPixel);
-																	var autoScrollPoint:Number = pianorollSprite.scrollRect.x + pianorollSprite.width - ACTIVATION_WIDTH;
-																	// 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点をまたいだらオートスクロール
-																	if (_positionXInPixel_prev < autoScrollPoint && autoScrollPoint <= _positionXInPixel) { // 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点にピッタリ到達してしまう場合に対処して後者は「<」ではなく「<=」にしておく
-																		//trace("stepped over");
-																		
-																		var DURATION_IN_FRAME:Number = 60.0; // 何フレームで動かすか
-																		for (i = 1.0 ; i <= DURATION_IN_FRAME ; i += 1.0) {
-																			var absoluteScrollEntry:Object; // スクロール先の絶対座標を保持するエントリ
-																			{
-																				absoluteScrollEntry = new Object(); // absoluteScrollEntry["scrollTo_x"] のみを要素に持つ連想配列
-																				absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, pianorollSprite.scrollRect.x, pianorollSprite.width - ACTIVATION_WIDTH, DURATION_IN_FRAME);
-																			}
-																			
-																			_absoluteScrollQueue.push(absoluteScrollEntry);
-																		}	
-																	}
-																}
-															}
-														}
-													}
-												}
-											}
-										}
 										{ // オートスクロールを処理
 											if (_absoluteScrollQueue.length > 0) {
 												var absoluteScrollEntry2:Object = _absoluteScrollQueue.shift();
@@ -326,57 +273,176 @@
 												pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 											}
 										}
-										{ // 再生位置バーとノートの交点のインジケータを描画
-											pianorollSprite.intersectionIndicatorLayer_ref.graphics.clear();
-											// 再生中かポーズ中のときのみインジケータを表示
-											if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) {
-												if(_pianoRollItemArrArr_ref != null){ // 各トラックのノートとの交点を計算して表示
-													var colorSet:ColorSet = new ColorSet();
+										{ // 再生中のUI処理
+											if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
+												{ // 再生位置文字列を更新
+													//trace(Util.getInstanceID(_sequencer_ref.getSoundChannel()));
 													
-													len2 = _pianoRollItemArrArr_ref.length;
-													//trace(_pianoRollItemArrArr_ref);
-													for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
-														colorSet.h = ((240-(-45))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-45)/*←8ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
-														colorSet.s = 100; // 彩度（saturation）
-														colorSet.v = 80; // 明度（value）
-														
-														pianorollSprite.intersectionIndicatorLayer_ref.graphics.beginFill(colorSet.c, 0.5);
-														pianorollSprite.intersectionIndicatorLayer_ref.graphics.lineStyle(2.0, 0x000000, 0.5);
-														{ // 再生位置バーとノートの交点にインジケータを描画
-															var pitchOfNoteAtSpecificTick:Number; // あるトラックの、ある再生位置[tick]におけるノートの音高
-															var volumeOfNoteAtSpecificTick:Number; // あるトラックの、ある再生位置[tick]におけるノートの音量（min=0.0, max=1.0）
-															{ // あるトラックの、ある再生位置[tick]におけるノートの音高を計算
-																pitchOfNoteAtSpecificTick = Number.NEGATIVE_INFINITY; // あるtickにおいて鳴っているノートがなかったら Number.NEGATIVE_INFINITY を入れておく
-																volumeOfNoteAtSpecificTick = 0.0; // あるtickにおいて鳴っているノートがなかったら 0.0 を入れておく
-																{ // MEvent インスタンスを順次走査
-																	// TODO: 二分探索を用いて処理を高速化する
-																	len = _pianoRollItemArrArr_ref[j].length;
-																	for (i = 0 ; i < len ; i++ ) { 
-																		var item2:PianoRollItem = _pianoRollItemArrArr_ref[j][i];
-																		
-																		if (item2.startPosInTick < positionXInTick && positionXInTick <= item2.endPosInTick) {
-																			// あるトラックの、ある再生位置[tick]におけるノートが確定したら、そのノートの音高を代入
-																			pitchOfNoteAtSpecificTick = item2.startPitch;
-																			volumeOfNoteAtSpecificTick = Number(item2.velocity) / 127.0;
-																		}else{
-																			continue;
+													// ここ、ちゃんと毎回 _sequencer_ref.getSoundChannel() しないと
+													// 「position がずっと変化しない SoundChannel インスタンス」に遭遇するので注意（原因不明）
+													_soundChannelPositionText_ref.text = "sound channel position: " + _sequencer_ref.getSoundChannel().position.toString();
+												}
+												{ // 再生位置バーを更新＋再生位置バーに応じてオートスクロールをキュー
+													pianorollSprite.playingPositionBarLayer_ref.graphics.clear();
+													
+														// 再生中かポーズ中のときのみ再生位置バーを表示
+														if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) {
+															if(soundChannel != null){ // 一応nullチェック
+																{
+																	{
+																		// TODO: 「1回目はpositionXInPixel_prev に未定義の値が入る」問題に一応対処
+																		_positionXInPixel_prev = _positionXInPixel; // _positionXInPixel を更新する前に _positionXInPixel_prev にバックアップ
+																		_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(soundChannel.position) / 96.0);
+																	}
+																	
+																	with (pianorollSprite.playingPositionBarLayer_ref.graphics) {
+																		lineStyle(4, 0x333333, 0.5);
+																		moveTo(_positionXInPixel, 0);
+																		lineTo(_positionXInPixel, PianoRoll.PIANOROLL_HEIGHT);
+																	}
+																	
+																	{ // 一定の条件が満たされたときにオートスクロールをキューする
+																		// オートスクロールが有効で、かつオートスクロール中でないときのみ新たにオートスクロールする
+																		if (autoScrollCheckBox.selected && _absoluteScrollQueue.length == 0) {
+																			var ACTIVATION_WIDTH:Number = PianoRoll.BEAT_WIDTH * 4; // 画面右端から何pixelの所をまたいだらオートスクロールするか
+																			
+																			//trace("_positionXInPixel_prev = " + _positionXInPixel_prev + ", _positionXInPixel = " + _positionXInPixel);
+																			var autoScrollPoint:Number = pianorollSprite.scrollRect.x + pianorollSprite.width - ACTIVATION_WIDTH;
+																			// 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点をまたいだらオートスクロール
+																			if (_positionXInPixel_prev < autoScrollPoint && autoScrollPoint <= _positionXInPixel) { // 再生位置バーが画面右端から ACTIVATION_WIDTH pixel の地点にピッタリ到達してしまう場合に対処して後者は「<」ではなく「<=」にしておく
+																				//trace("stepped over");
+																				
+																				var DURATION_IN_FRAME:Number = 60.0; // 何フレームで動かすか
+																				for (i = 1.0 ; i <= DURATION_IN_FRAME ; i += 1.0) {
+																					var absoluteScrollEntry:Object; // スクロール先の絶対座標を保持するエントリ
+																					{
+																						absoluteScrollEntry = new Object(); // absoluteScrollEntry["scrollTo_x"] のみを要素に持つ連想配列
+																						absoluteScrollEntry["scrollTo_x"] = Util.easeInOut_Quadratic(i, pianorollSprite.scrollRect.x, pianorollSprite.width - ACTIVATION_WIDTH, DURATION_IN_FRAME);
+																					}
+																					
+																					_absoluteScrollQueue.push(absoluteScrollEntry);
+																				}	
+																			}
 																		}
 																	}
 																}
 															}
-															
-															// インジケータを描画
-															if (volumeOfNoteAtSpecificTick <= 0.0) { continue; } // 音量が0以下の場合はインジケータを描画しようとしない
-															pianorollSprite.intersectionIndicatorLayer_ref.graphics.drawCircle(
-																Number(PianoRoll.BEAT_WIDTH) * (positionXInTick / 96.0),
-																PianoRoll.PIANOROLL_HEIGHT - PianoRoll.SEMITONE_HEIGHT * (pitchOfNoteAtSpecificTick / 100.0),
-																// 数値的な音の大きさではなく心理的な音の大きさを図示したいので、対数を取っておく。
-																// TODO: MEvent.VOL_MODE （音量モードの線形/非線形を切り替えるイベント）に対応する
-																// volume が0.001未満の場合は0.001扱いとする。
-																4.0/*<-このパラメータで大きさを調整*/ * (Math.log(Math.max(0.001, volumeOfNoteAtSpecificTick)) + 3.0)
-																);
 														}
-														pianorollSprite.intersectionIndicatorLayer_ref.graphics.endFill();
+													
+												}
+												{ // 再生位置バーとノートの交点のインジケータの位置を更新
+													if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) { // 再生中かポーズ中のときのみ更新
+														len2 = _pianoRollItemArrArr_ref.length;
+														for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
+															if (_indicatorEasingQueueArr[j] == null) { _indicatorEasingQueueArr[j] = new Array(); } // キューがなかったら作る
+															
+															{ // インジケータイージングキュー[j]の要素を1個消化
+																if(_indicatorEasingQueueArr[j].length > 0){
+																	_indicatorYArr[j] = _indicatorEasingQueueArr[j].shift(); // インジケータイージングキュー[j]から1個 dequeue してそれをトラック j の現在のインジケータの位置に代入
+																}
+															}
+															{ // 「インジケータの状況」および「現在再生中の音高」に基づいて、インジケータイージングキュー[j]に新たなエントリを enqueue
+																var pitchOfNoteAtCurrentTick:Number; // トラック j の、現在の再生位置[tick]におけるノートの音高
+																var volumeOfNoteAtCurrentTick:Number; // トラック j の、ある再生位置[tick]におけるノートの音量（min=0.0, max=1.0）
+																{ // あるトラックの、ある再生位置[tick]におけるノートの音高と音量を取得
+																	pitchOfNoteAtCurrentTick = Number.NEGATIVE_INFINITY; // あるtickにおいて鳴っているノートがなかったら Number.NEGATIVE_INFINITY を入れておく
+																	volumeOfNoteAtCurrentTick = 0.0; // あるtickにおいて鳴っているノートがなかったら 0.0 を入れておく
+																	{ // MEvent インスタンスを順次走査
+																		// TODO: 二分探索を用いて処理を高速化する
+																		len = _pianoRollItemArrArr_ref[j].length;
+																		for (i = 0 ; i < len ; i++ ) { 
+																			var item2:PianoRollItem = _pianoRollItemArrArr_ref[j][i];
+																			
+																			if (item2.startPosInTick < positionXInTick && positionXInTick <= item2.endPosInTick) {
+																				// あるトラックの、ある再生位置[tick]におけるノートが確定したら、そのノートの音高を代入
+																				pitchOfNoteAtCurrentTick = item2.startPitch;
+																				volumeOfNoteAtCurrentTick = Number(item2.velocity) / 127.0;
+																			}else{
+																				continue;
+																			}
+																		}
+																	}
+																}
+																
+																if(pitchOfNoteAtCurrentTick != Number.NEGATIVE_INFINITY){ // 再生位置バーとノートの交点が存在しない場合は何もしない
+																	var desirableY:Number = PianoRoll.PIANOROLL_HEIGHT - PianoRoll.SEMITONE_HEIGHT * (pitchOfNoteAtCurrentTick / 100.0); // インジケータがあるべき位置
+																	
+																	if (_indicatorYArr[j] == undefined) { // まだインジケータが画面上に出現したことがない場合
+																		//trace("_indicatorYArr[j] = desirableY: " + _indicatorYArr[j] + " = " + desirableY);
+																		_indicatorYArr[j] = desirableY;// イージングせず即位置を変更
+																	}else { // インジケータが既に画面上に出現したことがあり、インジケータのy座標が既に存在する場合は
+																		if (_indicatorEasingQueueArr[j].length == 0) { // イージング処理が完了済みだったら、「現在のインジケータの位置」と「インジケータのあるべき位置」を比較して、インジケータイージングキュー[j]にエントリを enqueue
+																			if (_indicatorYArr[j] != desirableY) {
+																				var DURATION_IN_FRAME2:Number = 2.0; // 何フレームで動かすか
+																				for (i = 1.0 ; i <= DURATION_IN_FRAME2 ; i += 1.0) {
+																					_indicatorEasingQueueArr[j].push(Util.easeOut_Quadratic(i, _indicatorYArr[j], desirableY - _indicatorYArr[j], DURATION_IN_FRAME2));
+																				}
+																			}
+																		}else {
+																			if (_indicatorEasingQueueArr[j][0]  != desirableY) { // イージング処理が途中だったら、「イージング処理終了後のインジケータの位置」と「インジケータのあるべき位置」を比較して、インジケータイージングキュー[j]にエントリを enqueue
+																				_indicatorEasingQueueArr[j].length = 0; // 元々行われていたイージングを中止
+																				var DURATION_IN_FRAME3:Number = 2.0; // 何フレームで動かすか
+																				for (i = 1.0 ; i <= DURATION_IN_FRAME3 ; i += 1.0) {
+																					_indicatorEasingQueueArr[j].push(Util.easeOut_Quadratic(i, _indicatorYArr[j], desirableY - _indicatorYArr[j], DURATION_IN_FRAME3));
+																				}
+																			}
+																		}
+																	}
+																}
+															}
+														}
+													}
+												}
+												{ // 再生位置バーとノートの交点のインジケータを描画
+													pianorollSprite.intersectionIndicatorLayer_ref.graphics.clear();
+													if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) { // 再生中かポーズ中のときのみインジケータを表示
+														if(_pianoRollItemArrArr_ref != null){ // 各トラックのノートとの交点を計算して表示
+															var colorSet:ColorSet = new ColorSet();
+															
+															len2 = _pianoRollItemArrArr_ref.length;
+															//trace(_pianoRollItemArrArr_ref);
+															for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
+																colorSet.h = ((240-(-45))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-45)/*←8ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
+																colorSet.s = 100; // 彩度（saturation）
+																colorSet.v = 80; // 明度（value）
+																
+																pianorollSprite.intersectionIndicatorLayer_ref.graphics.beginFill(colorSet.c, 0.5);
+																pianorollSprite.intersectionIndicatorLayer_ref.graphics.lineStyle(2.0, 0x000000, 0.5);
+																{ // 再生位置バーとノートの交点にインジケータを描画
+																	var volumeOfNoteAtSpecificTick:Number; // あるトラックの、ある再生位置[tick]におけるノートの音量（min=0.0, max=1.0）
+																	{ // あるトラックの、ある再生位置[tick]におけるノートの音量を取得
+																		volumeOfNoteAtSpecificTick = 0.0; // あるtickにおいて鳴っているノートがなかったら 0.0 を入れておく
+																		{ // MEvent インスタンスを順次走査
+																			// TODO: 二分探索を用いて処理を高速化する
+																			len = _pianoRollItemArrArr_ref[j].length;
+																			for (i = 0 ; i < len ; i++ ) { 
+																				var item3:PianoRollItem = _pianoRollItemArrArr_ref[j][i];
+																				
+																				if (item3.startPosInTick < positionXInTick && positionXInTick <= item3.endPosInTick) {
+																					// あるトラックの、ある再生位置[tick]におけるノートが確定したら、そのノートの音量を代入
+																					volumeOfNoteAtSpecificTick = Number(item3.velocity) / 127.0;
+																				}else{
+																					continue;
+																				}
+																			}
+																		}
+																	}
+																	
+																	// インジケータを描画
+																	if (_indicatorYArr[j] == undefined) { continue; } // インジケータがまだ画面上に現れたことがない場合はインジケータを描画しようとしない
+																	if (volumeOfNoteAtSpecificTick <= 0.0) { continue; } // 音量が0以下の場合はインジケータを描画しようとしない
+																	pianorollSprite.intersectionIndicatorLayer_ref.graphics.drawCircle(
+																		Number(PianoRoll.BEAT_WIDTH) * (positionXInTick / 96.0),
+																		_indicatorYArr[j],
+																		// 数値的な音の大きさではなく心理的な音の大きさを図示したいので、対数を取っておく。
+																		// TODO: MEvent.VOL_MODE （音量モードの線形/非線形を切り替えるイベント）に対応する
+																		// volume が0.001未満の場合は0.001扱いとする。
+																		4.0/*<-このパラメータで大きさを調整*/ * (Math.log(Math.max(0.001, volumeOfNoteAtSpecificTick)) + 3.0)
+																		);
+																}
+																pianorollSprite.intersectionIndicatorLayer_ref.graphics.endFill();
+															}
+														}
 													}
 												}
 											}
@@ -647,8 +713,13 @@
 								}
 							}
 						}
-					}
-					else {
+						{ // 再生位置バーとノートの交点に表示するインジケータのy座標を全て undefined にする
+							_indicatorYArr = new Array();
+						}
+						{ // インジケータイージングキューを初期化する
+							_indicatorEasingQueueArr = new Array();
+						}
+					}else {
 						player.pause();
 						playButton.label = "Play";
 						m_timer.stop();
