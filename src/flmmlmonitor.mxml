@@ -341,9 +341,11 @@
 													pianorollSprite.intersectionIndicatorLayer_ref.graphics.beginFill(colorSet.c, 0.5);
 													pianorollSprite.intersectionIndicatorLayer_ref.graphics.lineStyle(2.0, 0x000000, 0.5);
 													{ // 再生位置バーとノートの交点にインジケータを描画
-														var pitchOfNoteAtSpecificTick:Number;// あるトラックの、ある再生位置[tick]におけるノートの音高
+														var pitchOfNoteAtSpecificTick:Number; // あるトラックの、ある再生位置[tick]におけるノートの音高
+														var volumeOfNoteAtSpecificTick:Number; // あるトラックの、ある再生位置[tick]におけるノートの音量（min=0.0, max=1.0）
 														{ // あるトラックの、ある再生位置[tick]におけるノートの音高を計算
 															pitchOfNoteAtSpecificTick = Number.NEGATIVE_INFINITY; // あるtickにおいて鳴っているノートがなかったら Number.NEGATIVE_INFINITY を入れておく
+															volumeOfNoteAtSpecificTick = 0.0; // あるtickにおいて鳴っているノートがなかったら 0.0 を入れておく
 															{ // MEvent インスタンスを順次走査
 																// TODO: 二分探索を用いて処理を高速化する
 																len = _pianoRollItemArrArr_ref[j].length;
@@ -353,6 +355,7 @@
 																	if (item2.startPosInTick < positionXInTick && positionXInTick <= item2.endPosInTick) {
 																		// あるトラックの、ある再生位置[tick]におけるノートが確定したら、そのノートの音高を代入
 																		pitchOfNoteAtSpecificTick = item2.startPitch;
+																		volumeOfNoteAtSpecificTick = Number(item2.velocity) / 127.0;
 																	}else{
 																		continue;
 																	}
@@ -361,10 +364,14 @@
 														}
 														
 														// インジケータを描画
+														if (volumeOfNoteAtSpecificTick <= 0.0) { continue; } // 音量が0以下の場合はインジケータを描画しようとしない
 														pianorollSprite.intersectionIndicatorLayer_ref.graphics.drawCircle(
 															Number(PianoRoll.BEAT_WIDTH) * (positionXInTick / 96.0),
-															PianoRoll.PIANOROLL_HEIGHT - PianoRoll.SEMITONE_HEIGHT*(pitchOfNoteAtSpecificTick / 100.0),
-															10.0
+															PianoRoll.PIANOROLL_HEIGHT - PianoRoll.SEMITONE_HEIGHT * (pitchOfNoteAtSpecificTick / 100.0),
+															// 数値的な音の大きさではなく心理的な音の大きさを図示したいので、対数を取っておく。
+															// TODO: MEvent.VOL_MODE （音量モードの線形/非線形を切り替えるイベント）に対応する
+															// volume が0.001未満の場合は0.001扱いとする。
+															4.0/*<-このパラメータで大きさを調整*/ * (Math.log(Math.max(0.001, volumeOfNoteAtSpecificTick)) + 3.0)
 															);
 													}
 													pianorollSprite.intersectionIndicatorLayer_ref.graphics.endFill();
