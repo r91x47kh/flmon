@@ -27,6 +27,11 @@ package net.vt6f3ohw.flmon {
 		public function get playingPositionBarLayer_ref():Shape {
 			return _playingPositionBarLayer_ref;
 		}
+		/** 再生位置バーとノートの交点を置くレイヤ */
+		private var _intersectionIndicatorLayer_ref:Shape;
+		public function get intersectionIndicatorLayer_ref():Shape {
+			return _intersectionIndicatorLayer_ref;
+		}
 		
 		public function PianoRoll() {
 			super();
@@ -97,6 +102,16 @@ package net.vt6f3ohw.flmon {
 				_playingPositionBarLayer_ref = playingPositionBarLayer; // 参照のプール
 				
 				this.addChild(playingPositionBarLayer);
+			}
+			{ // 子Shape （再生位置バーとノートの交点を置くレイヤ）を追加
+				var intersectionIndicatorLayer:Shape;
+				{
+					intersectionIndicatorLayer = new Shape();
+					intersectionIndicatorLayer.cacheAsBitmap = true; // 描画結果（＝ビットマップ）をキャッシュして高速化
+				}
+				_intersectionIndicatorLayer_ref = intersectionIndicatorLayer; // 参照のプール
+				
+				this.addChild(intersectionIndicatorLayer);
 			}
 		}
 		

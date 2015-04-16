@@ -109,6 +109,8 @@
 				// 再生情報取得用変数たち
 				/** MSequencerインスタンスへの参照 */
 				private var _sequencer_ref:MSequencer = null;
+				/** ノート(= PianoRollItem)の集合の集合。_例えば pianoRollItemArr_ref[0] には0トラック目のノートの集合が入っている。 */
+				private var _pianoRollItemArrArr_ref:Array = null;
 				/** テンポ境界における「再生位置[ms]」「再生位置[tick]」「後続のテンポ」の情報の列 */
 				private var _tempoEntries_ref:Array;
 				/** 再生位置[ms]に対応する再生位置[tick]を返す。*/
@@ -136,13 +138,16 @@
 					
 					// 与えられた再生位置[ms]が全てのテンポ境界よりも後にあった場合
 					return _tempoEntries_ref[len - 1]["tick"] + (ms - _tempoEntries_ref[len - 1]["ms"]) * (_tempoEntries_ref[len - 1]["tempo"] / 60.0 / 1000.0 * 96.0);
-			};
+				};
 				
 				// キー入力状態
 				private var _isKeyPressed:Object = new Object(); // _isKeyPressed[Keyboard.XX] にキーの押下状態を保持
 
 				public function init():void {
 					var i:Number; // for用
+					var j:Number; // for用
+					var len:int; // for用
+					var len2:int; // for用
 					  
 					if (this.parameters["mml"] != undefined) // mmlパラメータが渡されていたらMML入力欄にそれを置いておく
 						input.text = unescape(this.parameters["mml"]);
@@ -232,14 +237,18 @@
 										pianorollSprite.addChild(soundChannelPositionText);
 									}
 									pianorollSprite.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
-										var soundChannel:SoundChannel = _sequencer_ref.getSoundChannel();
-										var positionXInTick:Number = _msToTick(soundChannel.position);
+										var soundChannel:SoundChannel = null;
+										var positionXInTick:Number;
+										if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
+											soundChannel = _sequencer_ref.getSoundChannel();
+											positionXInTick = _msToTick(soundChannel.position);
+										}
 										
 										{ // フレームカウント文字列を更新
 											_frameCounterText_ref.text = "frame count: " + (++_frameCounter).toString();
 										}
 										{ // 再生位置文字列を更新
-											if (_sequencer_ref != null) {
+											if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
 												//trace(Util.getInstanceID(_sequencer_ref.getSoundChannel()));
 												
 												// ここ、ちゃんと毎回 _sequencer_ref.getSoundChannel() しないと
@@ -263,7 +272,7 @@
 										}
 										{ // 再生位置バーを更新＋再生位置バーに応じてオートスクロールをキュー
 											pianorollSprite.playingPositionBarLayer_ref.graphics.clear();
-											if (_sequencer_ref != null) { // 一応nullチェック
+											if (_sequencer_ref != null) { // 最初に再生するまではずっとnullなのでnullチェック
 												// 再生中かポーズ中のときのみ再生位置バーを表示
 												if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) {
 													if(soundChannel != null){ // 一応nullチェック
@@ -316,6 +325,54 @@
 												_absoluteScroll(absoluteScrollEntry2["scrollTo_x"], _pianorollSprite_ref.scrollRect.y);
 												pianorollSprite.dispatchEvent(new Event(Event.SCROLL)); // Event.SCROLL イベントを dispatch
 											}
+										}
+										{ // 再生位置バーとノートの交点を描画
+											pianorollSprite.intersectionIndicatorLayer_ref.graphics.clear();
+											if(_pianoRollItemArrArr_ref != null){ // 各トラックのノートとの交点を計算して表示
+												var colorSet:ColorSet = new ColorSet();
+												
+												len2 = _pianoRollItemArrArr_ref.length;
+												//trace(_pianoRollItemArrArr_ref);
+												for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
+													colorSet.h = ((240-(-45))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-45)/*←8ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
+													colorSet.s = 100; // 彩度（saturation）
+													colorSet.v = 80; // 明度（value）
+													
+													pianorollSprite.intersectionIndicatorLayer_ref.graphics.beginFill(colorSet.c, 0.5);
+													pianorollSprite.intersectionIndicatorLayer_ref.graphics.lineStyle(2.0, 0x000000, 0.5);
+													{ // 再生位置バーとノートの交点にインジケータを描画
+														var pitchOfNoteAtSpecificTick:Number;// あるトラックの、ある再生位置[tick]におけるノートの音高
+														{ // あるトラックの、ある再生位置[tick]におけるノートの音高を計算
+															pitchOfNoteAtSpecificTick = Number.NEGATIVE_INFINITY; // あるtickにおいて鳴っているノートがなかったら Number.NEGATIVE_INFINITY を入れておく
+															{ // MEvent インスタンスを順次走査
+																// TODO: 二分探索を用いて処理を高速化する
+																len = _pianoRollItemArrArr_ref[j].length;
+																for (i = 0 ; i < len ; i++ ) { 
+																	var item2:PianoRollItem = _pianoRollItemArrArr_ref[j][i];
+																	
+																	if (item2.startPosInTick < positionXInTick && positionXInTick <= item2.endPosInTick) {
+																		// あるトラックの、ある再生位置[tick]におけるノートが確定したら、そのノートの音高を代入
+																		pitchOfNoteAtSpecificTick = item2.startPitch;
+																	}else{
+																		continue;
+																	}
+																}
+															}
+														}
+														
+														// インジケータを描画
+														pianorollSprite.intersectionIndicatorLayer_ref.graphics.drawCircle(
+															Number(PianoRoll.BEAT_WIDTH) * (positionXInTick / 96.0),
+															PianoRoll.PIANOROLL_HEIGHT - PianoRoll.SEMITONE_HEIGHT*(pitchOfNoteAtSpecificTick / 100.0),
+															10.0
+															);
+													}
+													pianorollSprite.intersectionIndicatorLayer_ref.graphics.endFill();
+												}
+											}
+											//with (pianorollSprite.intersectionIndicatorLayer_ref.graphics) {
+											//
+											//}
 										}
 									});
 									pianorollSprite.addEventListener(Event.SCROLL, function(e:Event):void { // pianorollSprite.scrollRect が変化したときに呼ばれるハンドラ
@@ -507,71 +564,79 @@
 							// tempoBoundaryEntries はここでは使わない。_tempoEntries_ref　に入れたらここでは用済み
 						}
 						{ // tracks[j] のノート(= PianoRollItem)の列を画面上に表示
-							var colorSet:ColorSet = new ColorSet(); // 
+							var colorSet:ColorSet = new ColorSet();
 							
 							_pianorollSprite_ref.itemLayer_ref.graphics.clear(); // まずレイヤ上の描画オブジェクトをクリア
 							{
-								len2 = tracks.length;
-								for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
-									eventsOfTrack = tracks[j].getEvents();
-									
-									{
-										var pianoRollItemArr:Array;
-										{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
-											pianoRollItemArr = new Array();
-											{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
-												len = eventsOfTrack.length;
-												for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-													e = eventsOfTrack[i];
-													if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
-													switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
-														case MStatus.NOTE_ON:
-															item = new PianoRollItem();
-															item.startPosInTick = e.getTick();
-															item.startPitch = e.getNoteNo()*100;
-															item.velocity = e.getVelocity();
-															break;
-														case MStatus.NOTE_OFF:
-															// TODO: 38401 tick目以降にあるNOTE_OFFでも、対応するNOTE_ONが38400 tick目以前にある場合は特別に処理する
-															item.endPosInTick = e.getTick();
-															pianoRollItemArr.push(item);
-															break;
-														case MStatus.NOTE: // TODO: タイに対応
-														case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
-														default:
-															break;
+								var pianoRollItemArrArr:Array;
+								{ // pianoRollItemArrArr を初期化
+									pianoRollItemArrArr = new Array();
+									{ // pianoRollItemArrArr に要素を追加していく
+										len2 = tracks.length;
+										for (j = 0 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）も見る
+											eventsOfTrack = tracks[j].getEvents();
+											
+											{
+												var pianoRollItemArr:Array;
+												{ // pianoRollItemArr を初期化。tracks[j] の MEvent 列をノート(= PianoRollItem)の列に変換
+													pianoRollItemArr = new Array();
+													{ // pianoRollItemArr にノート(= PianoRollItem)を push していく
+														len = eventsOfTrack.length;
+														for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+															e = eventsOfTrack[i];
+															if (e.getTick() > 38400) { break; } // 1-origin で101小節目以降のイベントは無視する
+															switch(e.getStatus()) { // TODO: test-driven で異常系を実装する
+																case MStatus.NOTE_ON:
+																	item = new PianoRollItem();
+																	item.startPosInTick = e.getTick();
+																	item.startPitch = e.getNoteNo()*100;
+																	item.velocity = e.getVelocity();
+																	break;
+																case MStatus.NOTE_OFF:
+																	// TODO: 38401 tick目以降にあるNOTE_OFFでも、対応するNOTE_ONが38400 tick目以前にある場合は特別に処理する
+																	item.endPosInTick = e.getTick();
+																	pianoRollItemArr.push(item);
+																	break;
+																case MStatus.NOTE: // TODO: タイに対応
+																case MStatus.DETUNE: // TODO: DETUNE によるノートの音高変化に対応
+																default:
+																	break;
+															}
+														}
 													}
 												}
-											}
-										}
-										
-										//できたノート(= PianoRollItem)列をダンプ
-										//trace(pianoRollItemArr);
-										
-										colorSet.h = ((240-(-30))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-30)/*←12ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
-										colorSet.s = 100; // 彩度（saturation）
-										colorSet.v = 80; // 明度（value）
-										_pianorollSprite_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
-										{
-											len = pianoRollItemArr.length;
-											for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
-												var item2:PianoRollItem = pianoRollItemArr[i];
+												//できたノート(= PianoRollItem)列をダンプ
+												//trace(pianoRollItemArr);
 												
-												with(_pianorollSprite_ref.itemLayer_ref.graphics){ // ノートレイヤにノートを配置
-													moveTo(
-														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
-														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-													);
-													lineTo(
-														Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
-														Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
-													);
-												}
+												pianoRollItemArrArr.push(pianoRollItemArr);
 											}
-						
 										}
 									}
-									
+								}
+								_pianoRollItemArrArr_ref = pianoRollItemArrArr; // 参照のプール
+								
+								for (j = 1 ; j < len2 ; j++ ) { // 0トラック目（テンポトラック）は無視
+									colorSet.h = ((240-(-45))/*←青スタート。0トラック目がテンポトラックであることに注意して1ステップ分の色相変位を引いておく*/ + ((-45)/*←8ステップで色相を1周するように1ステップあたりの色相変位を設定。また、色相を「青→水色→黄緑→黄→橙→赤→紫」という風に逆順に辿るため負の値を設定*/*j)) % 360; // 色相（hue）
+									colorSet.s = 100; // 彩度（saturation）
+									colorSet.v = 85; // 明度（value）
+									_pianorollSprite_ref.itemLayer_ref.graphics.lineStyle(2, colorSet.c);
+									{
+										len = pianoRollItemArrArr[j].length;
+										for (i = 0 ; i < len ; i++ ) { // MEvent インスタンスを順次走査
+											var item2:PianoRollItem = pianoRollItemArrArr[j][i];
+											
+											with(_pianorollSprite_ref.itemLayer_ref.graphics){ // ノートレイヤにノートを配置
+												moveTo(
+													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.startPosInTick) / 96.0),
+													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+												);
+												lineTo(
+													Number(PianoRoll.BEAT_WIDTH) * (Number(item2.endPosInTick) / 96.0),
+													Number(PianoRoll.SEMITONE_HEIGHT) * (128.0 - (Number(item2.startPitch) / 100.0))
+												);
+											}
+										}
+									}
 								}
 							}
 						}
