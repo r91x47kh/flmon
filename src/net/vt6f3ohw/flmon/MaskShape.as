@@ -20,14 +20,20 @@ package net.vt6f3ohw.flmon {
 			this.graphics.beginFill(0x000000);
 			this.graphics.drawRect(0, 0, parent.width, parent.height);
 			this.graphics.endFill();
-			parent.addEventListener(Event.RESIZE, function(e:Event):void {
-				{ // 親DisplayObjectのサイズ変化に応じてマスク矩形のサイズを更新
-					self.graphics.clear();
-					self.graphics.beginFill(0x000000);
-					self.graphics.drawRect(0, 0, parent.width, parent.height);
-					self.graphics.endFill();
-				}
-			});
+			{
+				var handler:Function = function(e:Event):void {
+					{ // マスク矩形のサイズを更新
+						self.graphics.clear();
+						self.graphics.beginFill(0x000000);
+						self.graphics.drawRect(0, 0, parent.width, parent.height);
+						self.graphics.endFill();
+					}
+				};
+				
+				// 親DisplayObjectのサイズ変化・位置変化を毎フレームチェックしてマスク矩形のサイズを更新
+				// (どうやら Flash には位置変化を通知するイベントが無いようなので(←確証無し)、Event.ENTER_FRAME を使わざるをえない)
+				parent.addEventListener(Event.ENTER_FRAME, handler); 
+			}
 		}
 		
 	}

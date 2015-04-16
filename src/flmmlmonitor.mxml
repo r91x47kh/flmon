@@ -36,6 +36,7 @@
 				import net.vt6f3ohw.flmon.ColorSet;
 				import net.vt6f3ohw.flmon.KeyBoardPanel;
 				import net.vt6f3ohw.flmon.MaskShape;
+				import net.vt6f3ohw.flmon.MeasureHeader;
 				import net.vt6f3ohw.flmon.PianoRoll;
 				import net.vt6f3ohw.flmon.PianoRollItem;
 				import net.vt6f3ohw.flmon.Util;
@@ -51,6 +52,8 @@
 				// 定数たち
 				
 				// Sprite製UI部品たち
+				
+				private var _measureheaderSprite_ref:MeasureHeader; // root となる Sprite
 				
 				private var _kboardSprite_ref:KeyBoardPanel; // root となる Sprite
 				
@@ -152,12 +155,29 @@
 					m_timer.addEventListener(TimerEvent.TIMER, onSecond);
 
 					{ // UIの用意
-						{ // 小節数表示部分のUIの準備
-							;
+						{ // 小節番号表示部分のUIの準備
+							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
+								measureheaderUIComponent.addChild(measureheaderUIComponent.mask = new MaskShape(measureheaderUIComponent));
+							}
+							{ // mx:Image の中に Sprite ツリーを投入
+								var measureheaderSprite:MeasureHeader; // mx:Image の中で root となる Sprite
+								{ // measureheaderSprite の初期化
+									measureheaderSprite = new MeasureHeader();
+									measureheaderSprite.scrollRect = new Rectangle(0, 0, measureheaderUIComponent.width, measureheaderUIComponent.height); // デフォルトのスクロール位置とビューポートのサイズを設定
+								}
+								_measureheaderSprite_ref = measureheaderSprite;
+								
+								measureheaderUIComponent.addChild(measureheaderSprite);
+							}
+							measureheaderUIComponent.addEventListener(Event.RESIZE, function(e:Event):void { // 小節番号表示ヘッダ部分のサイズが変わった場合に備えてイベントハンドラを設定
+								{ // 鍵盤部分のビューポートのサイズを更新
+									_updateScrollRect(_measureheaderSprite_ref, null, null, measureheaderUIComponent.width, measureheaderUIComponent.height);
+								}
+							});
 						}
 						{ // 鍵盤部分のUIの準備
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-								kboardUIComponent.addChild(kboardUIComponent.mask = new MaskShape(kboardUIComponent)); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+								kboardUIComponent.addChild(kboardUIComponent.mask = new MaskShape(kboardUIComponent));
 							}
 							{ // mx:Image の中に Sprite ツリーを投入
 								var kboardSprite:KeyBoardPanel; // mx:Image の中で root となる Sprite
@@ -177,7 +197,7 @@
 						}
 						{ // ピアノロール部分のUIの準備
 							{ // 描画が mx:Image 外にはみ出さないように、mx:Image にマスクを設定
-								pianorollUIComponent.addChild(pianorollUIComponent.mask = new MaskShape(pianorollUIComponent)); // マスクをかける位置は動的に変化するため、addChild しておかないとマスクの位置がズレるので注意
+								pianorollUIComponent.addChild(pianorollUIComponent.mask = new MaskShape(pianorollUIComponent));
 							}
 							{ // mx:Image の中に Sprite ツリーを投入
 								var pianorollSprite:PianoRoll; // mx:Image の中で root となる Sprite
@@ -212,6 +232,9 @@
 										pianorollSprite.addChild(soundChannelPositionText);
 									}
 									pianorollSprite.addEventListener(Event.ENTER_FRAME, function(e:Event):void { // デバッグ用。フレームカウンタを表示
+										var soundChannel:SoundChannel = _sequencer_ref.getSoundChannel();
+										var positionXInTick:Number = _msToTick(soundChannel.position);
+										
 										{ // フレームカウント文字列を更新
 											_frameCounterText_ref.text = "frame count: " + (++_frameCounter).toString();
 										}
@@ -241,8 +264,6 @@
 										{ // 再生位置バーを更新＋再生位置バーに応じてオートスクロールをキュー
 											pianorollSprite.playingPositionBarLayer_ref.graphics.clear();
 											if (_sequencer_ref != null) { // 一応nullチェック
-												var soundChannel:SoundChannel = _sequencer_ref.getSoundChannel();
-												
 												// 再生中かポーズ中のときのみ再生位置バーを表示
 												if (_sequencer_ref.isPlaying() || _sequencer_ref.isPaused()) {
 													if(soundChannel != null){ // 一応nullチェック
@@ -250,7 +271,7 @@
 															{
 																// TODO: 「1回目はpositionXInPixel_prev に未定義の値が入る」問題に一応対処
 																_positionXInPixel_prev = _positionXInPixel; // _positionXInPixel を更新する前に _positionXInPixel_prev にバックアップ
-																_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(_sequencer_ref.getSoundChannel().position) / 96.0);
+																_positionXInPixel = Number(PianoRoll.BEAT_WIDTH) * (_msToTick(soundChannel.position) / 96.0);
 															}
 															
 															with (pianorollSprite.playingPositionBarLayer_ref.graphics) {
@@ -300,6 +321,9 @@
 									pianorollSprite.addEventListener(Event.SCROLL, function(e:Event):void { // pianorollSprite.scrollRect が変化したときに呼ばれるハンドラ
 										pianorollHScrollBar.scrollPosition = pianorollSprite.scrollRect.x;
 										pianorollVScrollBar.scrollPosition = pianorollSprite.scrollRect.y;
+										{ // 「小節番号表示ヘッダSpriteのx方向のクリッピング位置」を「ピアノロールSpriteのx方向のクリッピング位置」と同期
+											_updateScrollRect(_measureheaderSprite_ref, _pianorollSprite_ref.scrollRect.x, null, null, null);
+										}
 										{ // 「鍵盤Spriteのy方向のクリッピング位置」を「ピアノロールSpriteのy方向のクリッピング位置」と同期
 											_updateScrollRect(_kboardSprite_ref, null, _pianorollSprite_ref.scrollRect.y, null, null);
 										}
@@ -602,7 +626,7 @@
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
 					<mx:GridItem height="48">
-						<!--小節数--><mx:Image id="measureheader" width="100%" height="100%"></mx:Image>
+						<!--小節番号表示ヘッダ--><mx:Image id="measureheaderUIComponent" width="100%" height="100%"></mx:Image>
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
 					</mx:GridItem>
@@ -624,7 +648,7 @@
 										scroll="
 										_absoluteScrollQueue.length = 0;
 										_absoluteScroll(_pianorollSprite_ref.scrollRect.x, pianorollVScrollBar.scrollPosition);
-										_updateScrollRect(_kboardSprite_ref, null, _pianorollSprite_ref.scrollRect.y, null, null);
+										_updateScrollRect(_kboardSprite_ref, null, pianorollVScrollBar.scrollPosition, null, null);
 										" />
 					</mx:GridItem>
 				</mx:GridRow>
@@ -641,6 +665,7 @@
 										scroll="
 										_absoluteScrollQueue.length = 0;
 										_absoluteScroll(pianorollHScrollBar.scrollPosition, _pianorollSprite_ref.scrollRect.y);
+										_updateScrollRect(_measureheaderSprite_ref, pianorollHScrollBar.scrollPosition, null, null, null);
 										" />
 					</mx:GridItem>
 					<mx:GridItem backgroundColor="#0080C0">
